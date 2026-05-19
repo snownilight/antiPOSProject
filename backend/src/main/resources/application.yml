@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    # 暫時改用 H2 記憶體資料庫
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+
+mybatis:
+  # 對應 XML 的位置
+  mapper-locations: classpath:mapper/*.xml
+  # 實體類別的位置，讓 XML 可以直接寫類別名稱
+  type-aliases-package: com.project.backend.entity
+  configuration:
+    # 開啟駝峰式命名轉換 (例如: user_name 自動對應 userName)
+    map-underscore-to-camel-case: true
+    # 開啟 SQL 列印方便開發時除錯
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

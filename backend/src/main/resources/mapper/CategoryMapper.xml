@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.project.backend.mapper.CategoryMapper">
+
+    <select id="findAllActive" resultType="com.project.backend.entity.Category">
+        SELECT * FROM category WHERE is_deleted = FALSE ORDER BY sort_order ASC, id ASC
+    </select>
+
+    <select id="findById" resultType="com.project.backend.entity.Category">
+        SELECT * FROM category WHERE id = #{id} AND is_deleted = FALSE
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO category (name, sort_order)
+        VALUES (#{name}, #{sortOrder})
+    </insert>
+
+    <update id="update">
+        UPDATE category
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+        </set>
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+
+    <update id="softDelete">
+        UPDATE category SET is_deleted = TRUE WHERE id = #{id}
+    </update>
+
+</mapper>

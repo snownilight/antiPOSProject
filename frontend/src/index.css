@@ -1,36 +1,218 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "bootstrap/dist/css/bootstrap.min.css";
+@import "bootstrap-icons/font/bootstrap-icons.css";
+
+:root {
+  --bg-color: #f8fafc;
+  --surface-color: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --text-primary: #1e293b;
+  --text-secondary: #64748b;
+  --accent-color: #3b82f6;
+  --accent-hover: #2563eb;
+  --danger-color: #ef4444;
+  --success-color: #10b981;
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --border-radius: 16px;
+}
+
 body {
   margin: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-color);
+  background-image: 
+    radial-gradient(at 0% 0%, hsla(210, 100%, 95%, 1) 0, transparent 50%), 
+    radial-gradient(at 50% 0%, hsla(280, 100%, 95%, 1) 0, transparent 50%), 
+    radial-gradient(at 100% 0%, hsla(339, 100%, 95%, 1) 0, transparent 50%);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom Gradients & Glow Effects */
-.bg-gradient-primary {
-  background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+/* Glassmorphism utilities */
+.glass-panel {
+  background: var(--surface-color);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-md);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  padding: 24px;
 }
 
-.glow-effect {
-  box-shadow: 0 0 40px rgba(13, 110, 253, 0.15) !important;
-  transition: all 0.3s ease;
+.glass-panel:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
 }
 
-.glow-effect:hover {
-  box-shadow: 0 0 60px rgba(13, 110, 253, 0.25) !important;
-  transform: translateY(-5px);
+/* Modern inputs & buttons */
+.modern-input {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  width: 100%;
+  transition: all 0.2s;
+}
+.modern-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
-.hover-scale {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+.modern-btn {
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+}
+.modern-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  color: white;
+}
+.modern-btn-danger {
+  background: var(--danger-color);
+}
+.modern-btn-danger:hover {
+  background: #dc2626;
+}
+.modern-btn-outline {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid rgba(0,0,0,0.1);
+}
+.modern-btn-outline:hover {
+  background: rgba(0,0,0,0.05);
+  color: var(--text-primary);
 }
 
-.hover-scale:hover {
-  transform: scale(1.05);
-  box-shadow: 0 10px 20px rgba(13, 110, 253, 0.3) !important;
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.tracking-wide {
-  letter-spacing: 1px;
+.animate-fade-in {
+  animation: fadeIn 0.4s ease forwards;
 }
+
+/* Base App Layout */
+.app-container {
+  display: flex;
+  min-height: 100vh;
+}
+.sidebar {
+  width: 260px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(20px);
+  color: white;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 4px 0 24px rgba(0,0,0,0.1);
+}
+.sidebar-logo {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 48px;
+  background: linear-gradient(135deg, #60a5fa, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.nav-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.nav-item {
+  color: rgba(255,255,255,0.6);
+  text-decoration: none;
+  padding: 14px 16px;
+  border-radius: 12px;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-weight: 500;
+}
+.nav-item:hover, .nav-item.active {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  transform: translateX(4px);
+}
+
+.main-content {
+  flex: 1;
+  padding: 40px 48px;
+  overflow-y: auto;
+}
+
+.page-title {
+  font-size: 32px;
+  font-weight: 800;
+  margin-bottom: 32px;
+  color: var(--text-primary);
+  letter-spacing: -0.5px;
+}
+
+/* Custom Table */
+.modern-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-top: 24px;
+}
+.modern-table th {
+  text-align: left;
+  padding: 16px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.modern-table td {
+  padding: 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  vertical-align: middle;
+}
+.modern-table tr:last-child td {
+  border-bottom: none;
+}
+.modern-table tbody tr {
+  transition: background 0.2s;
+}
+.modern-table tbody tr:hover {
+  background: rgba(0,0,0,0.02);
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+.status-available { background: rgba(16, 185, 129, 0.1); color: #059669; }
+.status-soldout { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
+.status-hidden { background: rgba(100, 116, 139, 0.1); color: #475569; }

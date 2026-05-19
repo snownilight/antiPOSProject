@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.project.backend.mapper.ProductMapper">
+
+    <select id="findAllActive" resultType="com.project.backend.entity.Product">
+        SELECT * FROM product 
+        WHERE is_deleted = FALSE 
+        <if test="categoryId != null">
+            AND category_id = #{categoryId}
+        </if>
+        ORDER BY category_id ASC, id ASC
+    </select>
+
+    <select id="findById" resultType="com.project.backend.entity.Product">
+        SELECT * FROM product WHERE id = #{id} AND is_deleted = FALSE
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO product (category_id, name, description, price, image_url, status)
+        VALUES (#{categoryId}, #{name}, #{description}, #{price}, #{imageUrl}, #{status})
+    </insert>
+
+    <update id="update">
+        UPDATE product
+        <set>
+            <if test="categoryId != null">category_id = #{categoryId},</if>
+            <if test="name != null">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="price != null">price = #{price},</if>
+            <if test="imageUrl != null">image_url = #{imageUrl},</if>
+            <if test="status != null">status = #{status},</if>
+        </set>
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+
+    <update id="softDelete">
+        UPDATE product SET is_deleted = TRUE WHERE id = #{id}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE product SET status = #{status} WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+
+</mapper>

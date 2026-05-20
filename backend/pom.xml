@@ -54,12 +54,7 @@
 			<artifactId>mybatis-spring-boot-starter</artifactId>
 			<version>3.0.3</version>
 		</dependency>
-		<!-- 暫時使用 H2 記憶體資料庫作測試 -->
-		<dependency>
-			<groupId>com.h2database</groupId>
-			<artifactId>h2</artifactId>
-			<scope>runtime</scope>
-		</dependency>
+
 		<!-- MySQL 連線驅動 -->
 		<dependency>
 			<groupId>com.mysql</groupId>

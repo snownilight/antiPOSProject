@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.project.backend.mapper.DiningTableMapper">
+
+    <select id="findAllActive" resultType="com.project.backend.entity.DiningTable">
+        SELECT * FROM dining_table WHERE is_deleted = FALSE ORDER BY name ASC, id ASC
+    </select>
+
+    <select id="findById" resultType="com.project.backend.entity.DiningTable">
+        SELECT * FROM dining_table WHERE id = #{id} AND is_deleted = FALSE
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO dining_table (name, seats, status)
+        VALUES (#{name}, #{seats}, #{status})
+    </insert>
+
+    <update id="update">
+        UPDATE dining_table
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="seats != null">seats = #{seats},</if>
+            <if test="status != null">status = #{status},</if>
+        </set>
+        WHERE id = #{id} AND is_deleted = FALSE
+    </update>
+
+    <update id="softDelete">
+        UPDATE dining_table SET is_deleted = TRUE WHERE id = #{id}
+    </update>
+
+</mapper>

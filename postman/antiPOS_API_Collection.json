@@ -1,0 +1,705 @@
+{
+  "info": {
+    "name": "antiPOS API Collection",
+    "description": "antiPOS 餐飲 POS 系統完整 API 測試集，涵蓋分類、商品、桌台管理的 CRUD 與邊緣條件測試。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8081/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Category（分類管理）",
+      "item": [
+        {
+          "name": "正常流程",
+          "item": [
+            {
+              "name": "取得所有分類",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/categories"
+              }
+            },
+            {
+              "name": "取得單筆分類",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/categories/1"
+              }
+            },
+            {
+              "name": "新增分類",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/categories",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman 測試分類\",\n  \"sortOrder\": 50\n}"
+                }
+              }
+            },
+            {
+              "name": "更新分類",
+              "request": {
+                "method": "PUT",
+                "url": "{{baseUrl}}/categories/1",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"更新後的分類名稱\",\n  \"sortOrder\": 15\n}"
+                }
+              }
+            },
+            {
+              "name": "刪除分類（軟刪除）",
+              "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/categories/1"
+              }
+            }
+          ]
+        },
+        {
+          "name": "邊緣條件",
+          "item": [
+            {
+              "name": "❌ 空字串名稱 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/categories",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"\",\n  \"sortOrder\": 0\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 缺少 name 欄位 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/categories",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"sortOrder\": 0\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 僅空白字串名稱 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/categories",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"   \",\n  \"sortOrder\": 0\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 負數排序權重 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/categories",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"負數排序\",\n  \"sortOrder\": -1\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 名稱超過 100 字元 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/categories",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\n  \"sortOrder\": 0\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 查詢不存在的 ID → 500",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/categories/99999"
+              }
+            },
+            {
+              "name": "🔒 SQL Injection 測試",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/categories",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"'; DROP TABLE category; --\",\n  \"sortOrder\": 0\n}"
+                }
+              }
+            },
+            {
+              "name": "🔒 XSS 攻擊測試",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/categories",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"<script>alert('xss')</script>\",\n  \"sortOrder\": 0\n}"
+                }
+              }
+            },
+            {
+              "name": "🌐 中文 + Emoji 名稱",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/categories",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"🍜 拉麵（限定版）\",\n  \"sortOrder\": 0\n}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Product（商品管理）",
+      "item": [
+        {
+          "name": "正常流程",
+          "item": [
+            {
+              "name": "取得所有商品",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/products"
+              }
+            },
+            {
+              "name": "依分類篩選商品 (categoryId=1)",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/products?categoryId=1",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products"],
+                  "query": [
+                    { "key": "categoryId", "value": "1" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "取得單筆商品",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/products/1"
+              }
+            },
+            {
+              "name": "新增商品",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/products",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Postman 測試商品\",\n  \"categoryId\": 1,\n  \"price\": 88.50,\n  \"description\": \"Postman 測試用商品描述\",\n  \"imageUrl\": \"\",\n  \"status\": \"AVAILABLE\"\n}"
+                }
+              }
+            },
+            {
+              "name": "更新商品",
+              "request": {
+                "method": "PUT",
+                "url": "{{baseUrl}}/products/1",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"更新後商品\",\n  \"categoryId\": 1,\n  \"price\": 120.00,\n  \"description\": \"已更新\",\n  \"status\": \"AVAILABLE\"\n}"
+                }
+              }
+            },
+            {
+              "name": "切換狀態 → SOLD_OUT",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/products/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"SOLD_OUT\"\n}"
+                }
+              }
+            },
+            {
+              "name": "切換狀態 → HIDDEN",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/products/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"HIDDEN\"\n}"
+                }
+              }
+            },
+            {
+              "name": "切換狀態 → AVAILABLE",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/products/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"AVAILABLE\"\n}"
+                }
+              }
+            },
+            {
+              "name": "刪除商品（軟刪除）",
+              "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/products/1"
+              }
+            }
+          ]
+        },
+        {
+          "name": "邊緣條件",
+          "item": [
+            {
+              "name": "❌ 缺少 name → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/products",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"categoryId\": 1,\n  \"price\": 50\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 缺少 categoryId → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/products",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"測試\",\n  \"price\": 50\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 缺少 price → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/products",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"測試\",\n  \"categoryId\": 1\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 負數價格 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/products",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"負價格測試\",\n  \"categoryId\": 1,\n  \"price\": -10\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 空字串商品名 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/products",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"\",\n  \"categoryId\": 1,\n  \"price\": 50\n}"
+                }
+              }
+            },
+            {
+              "name": "✅ 價格 0（免費）→ 200",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/products",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"免費贈品\",\n  \"categoryId\": 1,\n  \"price\": 0\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 商品名超過 200 字元 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/products",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\",\n  \"categoryId\": 1,\n  \"price\": 10\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 描述超過 500 字元 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/products",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"描述測試\",\n  \"categoryId\": 1,\n  \"price\": 10,\n  \"description\": \"DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD\"\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 狀態切換缺少 status → 400",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/products/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "❌ 空字串 status → 400",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/products/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"\"\n}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DiningTable（桌台管理）",
+      "item": [
+        {
+          "name": "正常流程",
+          "item": [
+            {
+              "name": "取得所有桌台",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/tables"
+              }
+            },
+            {
+              "name": "取得單筆桌台",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/tables/1"
+              }
+            },
+            {
+              "name": "新增桌台",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/tables",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"PM-T1\",\n  \"seats\": 6\n}"
+                }
+              }
+            },
+            {
+              "name": "更新桌台",
+              "request": {
+                "method": "PUT",
+                "url": "{{baseUrl}}/tables/1",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"PM-T1-Updated\",\n  \"seats\": 8\n}"
+                }
+              }
+            },
+            {
+              "name": "狀態 → OCCUPIED（開始用餐）",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/tables/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"OCCUPIED\"\n}"
+                }
+              }
+            },
+            {
+              "name": "狀態 → CLEANING（結帳清潔）",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/tables/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"CLEANING\"\n}"
+                }
+              }
+            },
+            {
+              "name": "狀態 → EMPTY（完成清潔）",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/tables/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"EMPTY\"\n}"
+                }
+              }
+            },
+            {
+              "name": "刪除桌台（軟刪除）",
+              "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/tables/1"
+              }
+            }
+          ]
+        },
+        {
+          "name": "邊緣條件",
+          "item": [
+            {
+              "name": "❌ 空字串桌台名 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/tables",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"\",\n  \"seats\": 4\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 缺少 name → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/tables",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"seats\": 4\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 僅空白桌台名 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/tables",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"   \",\n  \"seats\": 4\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 座位數 0 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/tables",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"ZeroSeat\",\n  \"seats\": 0\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 座位數負數 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/tables",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"NegSeat\",\n  \"seats\": -5\n}"
+                }
+              }
+            },
+            {
+              "name": "✅ 座位數 1（最小合法值）→ 200",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/tables",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"SingleSeat\",\n  \"seats\": 1\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 不合法狀態值 → 400",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/tables/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"INVALID_STATUS\"\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 缺少 status 欄位 → 400",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/tables/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                }
+              }
+            },
+            {
+              "name": "❌ 空字串 status → 400",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/tables/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"\"\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 桌台名超過 50 字元 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/tables",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT\",\n  \"seats\": 2\n}"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

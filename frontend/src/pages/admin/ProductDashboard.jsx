@@ -24,6 +24,13 @@ const ProductDashboard = () => {
             <i className="bi bi-tags"></i>
             分類管理
           </NavLink>
+          <NavLink 
+            to="/admin/tables" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <i className="bi bi-grid-3x3-gap"></i>
+            桌台管理
+          </NavLink>
         </nav>
       </div>
 

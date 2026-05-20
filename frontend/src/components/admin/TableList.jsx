@@ -1,0 +1,361 @@
+/* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
+import { useState, useEffect } from 'react';
+import { Modal, Form } from 'react-bootstrap';
+
+const TableList = () => {
+  const [tables, setTables] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [editingTable, setEditingTable] = useState(null);
+  const [formData, setFormData] = useState({ name: '', seats: 2, status: 'EMPTY' });
+
+  const fetchTables = async () => {
+    try {
+      const res = await fetch('http://localhost:8081/api/tables');
+      const json = await res.json();
+      if (json.code === 200) {
+        setTables(json.data);
+      }
+    } catch (error) {
+      console.error('Error fetching tables:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTables();
+  }, []);
+
+  const handleClose = () => {
+    setShowModal(false);
+    setEditingTable(null);
+    setFormData({ name: '', seats: 2, status: 'EMPTY' });
+  };
+
+  const handleShow = (table = null) => {
+    if (table) {
+      setEditingTable(table);
+      setFormData({ name: table.name, seats: table.seats, status: table.status });
+    }
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const url = editingTable 
+      ? `http://localhost:8081/api/tables/${editingTable.id}`
+      : 'http://localhost:8081/api/tables';
+    const method = editingTable ? 'PUT' : 'POST';
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      if (res.ok) {
+        fetchTables();
+        handleClose();
+      }
+    } catch (error) {
+      console.error('Error saving table:', error);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('確定要刪除此桌台嗎？')) return;
+    try {
+      const res = await fetch(`http://localhost:8081/api/tables/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchTables();
+      }
+    } catch (error) {
+      console.error('Error deleting table:', error);
+    }
+  };
+
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      const res = await fetch(`http://localhost:8081/api/tables/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (res.ok) {
+        fetchTables();
+      }
+    } catch (error) {
+      console.error('Error changing table status:', error);
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'EMPTY': return '空閒';
+      case 'OCCUPIED': return '使用中';
+      case 'CLEANING': return '清潔中';
+      default: return status;
+    }
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'EMPTY': return 'badge-empty';
+      case 'OCCUPIED': return 'badge-occupied';
+      case 'CLEANING': return 'badge-cleaning';
+      default: return '';
+    }
+  };
+
+  const getStatusCardClass = (status) => {
+    switch (status) {
+      case 'EMPTY': return 'status-empty';
+      case 'OCCUPIED': return 'status-occupied';
+      case 'CLEANING': return 'status-cleaning';
+      default: return '';
+    }
+  };
+
+  return (
+    <div className="glass-panel">
+      {/* Custom Styles Injection */}
+      <style>{`
+        .table-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 24px;
+          margin-top: 24px;
+        }
+        .table-card {
+          background: rgba(255, 255, 255, 0.7);
+          backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.6);
+          border-radius: 16px;
+          padding: 24px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          position: relative;
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          min-height: 200px;
+        }
+        .table-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 6px;
+          height: 100%;
+          transition: all 0.3s;
+        }
+        
+        /* Status Color Themes */
+        .table-card.status-empty {
+          border-color: rgba(16, 185, 129, 0.2);
+          box-shadow: 0 4px 20px rgba(16, 185, 129, 0.03);
+        }
+        .table-card.status-empty::before {
+          background: #10b981;
+        }
+        .table-card.status-empty:hover {
+          box-shadow: 0 10px 25px rgba(16, 185, 129, 0.12);
+          border-color: rgba(16, 185, 129, 0.5);
+          transform: translateY(-4px);
+        }
+
+        .table-card.status-occupied {
+          border-color: rgba(239, 68, 68, 0.2);
+          box-shadow: 0 4px 20px rgba(239, 68, 68, 0.03);
+        }
+        .table-card.status-occupied::before {
+          background: #ef4444;
+        }
+        .table-card.status-occupied:hover {
+          box-shadow: 0 10px 25px rgba(239, 68, 68, 0.12);
+          border-color: rgba(239, 68, 68, 0.5);
+          transform: translateY(-4px);
+        }
+
+        .table-card.status-cleaning {
+          border-color: rgba(245, 158, 11, 0.2);
+          box-shadow: 0 4px 20px rgba(245, 158, 11, 0.03);
+        }
+        .table-card.status-cleaning::before {
+          background: #f59e0b;
+        }
+        .table-card.status-cleaning:hover {
+          box-shadow: 0 10px 25px rgba(245, 158, 11, 0.12);
+          border-color: rgba(245, 158, 11, 0.5);
+          transform: translateY(-4px);
+        }
+
+        .table-icon-wrapper {
+          width: 50px;
+          height: 50px;
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 24px;
+          background: rgba(0, 0, 0, 0.03);
+          color: #64748b;
+        }
+        .status-empty .table-icon-wrapper {
+          background: rgba(16, 185, 129, 0.1);
+          color: #10b981;
+        }
+        .status-occupied .table-icon-wrapper {
+          background: rgba(239, 68, 68, 0.1);
+          color: #ef4444;
+        }
+        .status-cleaning .table-icon-wrapper {
+          background: rgba(245, 158, 11, 0.1);
+          color: #f59e0b;
+        }
+        
+        .badge-empty { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .badge-occupied { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+        .badge-cleaning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+      `}</style>
+
+      {/* Header */}
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h2 className="page-title mb-0">桌台管理</h2>
+        <button className="modern-btn" onClick={() => handleShow()}>
+          <i className="bi bi-plus-lg"></i> 新增桌台
+        </button>
+      </div>
+
+      {/* Grid of Tables */}
+      <div className="table-grid animate-fade-in">
+        {tables.map(table => (
+          <div key={table.id} className={`table-card ${getStatusCardClass(table.status)}`}>
+            {/* Top row with name, icon and action options */}
+            <div>
+              <div className="d-flex justify-content-between align-items-start mb-3">
+                <div className="d-flex align-items-center gap-3">
+                  <div className="table-icon-wrapper">
+                    <i className="bi bi-grid-3x3-gap-fill"></i>
+                  </div>
+                  <div>
+                    <h4 className="fw-bold mb-0 text-dark">{table.name}</h4>
+                    <small className="text-muted d-flex align-items-center gap-1 mt-1">
+                      <i className="bi bi-people-fill"></i> {table.seats} 人桌
+                    </small>
+                  </div>
+                </div>
+                {/* Edit & Delete Action Buttons */}
+                <div className="d-flex gap-2">
+                  <button className="btn btn-link text-secondary p-0" title="編輯" onClick={() => handleShow(table)}>
+                    <i className="bi bi-pencil" style={{fontSize: '15px'}}></i>
+                  </button>
+                  <button className="btn btn-link text-danger p-0" title="刪除" onClick={() => handleDelete(table.id)}>
+                    <i className="bi bi-trash" style={{fontSize: '15px'}}></i>
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Badge */}
+              <div className="mt-2">
+                <span className={`status-badge ${getStatusBadgeClass(table.status)}`}>
+                  {getStatusLabel(table.status)}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Status Workflow Action Button */}
+            <div className="mt-4">
+              {table.status === 'EMPTY' && (
+                <button 
+                  className="modern-btn w-100 py-2" 
+                  onClick={() => handleStatusChange(table.id, 'OCCUPIED')}
+                >
+                  <i className="bi bi-play-fill"></i> 開始用餐
+                </button>
+              )}
+              {table.status === 'OCCUPIED' && (
+                <button 
+                  className="modern-btn modern-btn-danger w-100 py-2" 
+                  onClick={() => handleStatusChange(table.id, 'CLEANING')}
+                >
+                  <i className="bi bi-cash-stack"></i> 結帳與清潔
+                </button>
+              )}
+              {table.status === 'CLEANING' && (
+                <button 
+                  className="modern-btn w-100 py-2" 
+                  style={{ background: '#f59e0b' }} 
+                  onClick={() => handleStatusChange(table.id, 'EMPTY')}
+                >
+                  <i className="bi bi-check-circle-fill"></i> 完成清潔
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+        {tables.length === 0 && (
+          <div className="text-center py-5 text-muted w-100" style={{ gridColumn: '1 / -1' }}>
+            目前沒有任何桌台
+          </div>
+        )}
+      </div>
+
+      {/* Add / Edit Modal */}
+      <Modal show={showModal} onHide={handleClose} centered>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">{editingTable ? '編輯桌台' : '新增桌台'}</Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleSubmit}>
+          <Modal.Body>
+            <Form.Group className="mb-3">
+              <Form.Label>桌台名稱</Form.Label>
+              <input 
+                type="text" 
+                className="modern-input" 
+                value={formData.name}
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                placeholder="例如: T1, A5"
+                required
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>容納人數</Form.Label>
+              <input 
+                type="number" 
+                className="modern-input" 
+                min="1"
+                value={formData.seats}
+                onChange={e => setFormData({...formData, seats: parseInt(e.target.value) || 2})}
+                required
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>桌台狀態</Form.Label>
+              <select 
+                className="modern-input"
+                value={formData.status}
+                onChange={e => setFormData({...formData, status: e.target.value})}
+                required
+              >
+                <option value="EMPTY">空閒 (EMPTY)</option>
+                <option value="OCCUPIED">使用中 (OCCUPIED)</option>
+                <option value="CLEANING">清潔中 (CLEANING)</option>
+              </select>
+            </Form.Group>
+          </Modal.Body>
+          <Modal.Footer className="border-0 pt-0">
+            <button type="button" className="modern-btn modern-btn-outline" onClick={handleClose}>
+              取消
+            </button>
+            <button type="submit" className="modern-btn">
+              儲存
+            </button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+    </div>
+  );
+};
+
+export default TableList;

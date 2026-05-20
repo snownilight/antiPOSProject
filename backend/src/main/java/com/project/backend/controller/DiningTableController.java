@@ -3,6 +3,7 @@ package com.project.backend.controller;
 import com.project.backend.common.ApiResponse;
 import com.project.backend.entity.DiningTable;
 import com.project.backend.service.DiningTableService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tables")
-@CrossOrigin(origins = "http://localhost:5173")
 public class DiningTableController {
 
     @Autowired
@@ -28,12 +28,12 @@ public class DiningTableController {
     }
 
     @PostMapping
-    public ApiResponse<DiningTable> createTable(@RequestBody DiningTable table) {
+    public ApiResponse<DiningTable> createTable(@Valid @RequestBody DiningTable table) {
         return ApiResponse.success("Table created successfully", diningTableService.createTable(table));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<DiningTable> updateTable(@PathVariable Long id, @RequestBody DiningTable table) {
+    public ApiResponse<DiningTable> updateTable(@PathVariable Long id, @Valid @RequestBody DiningTable table) {
         return ApiResponse.success("Table updated successfully", diningTableService.updateTable(id, table));
     }
 

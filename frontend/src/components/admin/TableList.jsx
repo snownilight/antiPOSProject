@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react';
 import { Modal, Form } from 'react-bootstrap';
+import API_BASE_URL from '../../utils/api';
 
 const TableList = () => {
   const [tables, setTables] = useState([]);
@@ -10,7 +11,7 @@ const TableList = () => {
 
   const fetchTables = async () => {
     try {
-      const res = await fetch('http://localhost:8081/api/tables');
+      const res = await fetch(`${API_BASE_URL}/tables`);
       const json = await res.json();
       if (json.code === 200) {
         setTables(json.data);
@@ -41,8 +42,8 @@ const TableList = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const url = editingTable 
-      ? `http://localhost:8081/api/tables/${editingTable.id}`
-      : 'http://localhost:8081/api/tables';
+      ? `${API_BASE_URL}/tables/${editingTable.id}`
+      : `${API_BASE_URL}/tables`;
     const method = editingTable ? 'PUT' : 'POST';
 
     try {
@@ -63,7 +64,7 @@ const TableList = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('確定要刪除此桌台嗎？')) return;
     try {
-      const res = await fetch(`http://localhost:8081/api/tables/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/tables/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -76,7 +77,7 @@ const TableList = () => {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      const res = await fetch(`http://localhost:8081/api/tables/${id}/status`, {
+      const res = await fetch(`${API_BASE_URL}/tables/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })

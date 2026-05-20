@@ -3,6 +3,7 @@ package com.project.backend.controller;
 import com.project.backend.common.ApiResponse;
 import com.project.backend.entity.Category;
 import com.project.backend.service.CategoryService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,7 +11,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/categories")
-@CrossOrigin(origins = "http://localhost:5173")
 public class CategoryController {
 
     @Autowired
@@ -27,12 +27,12 @@ public class CategoryController {
     }
 
     @PostMapping
-    public ApiResponse<Category> createCategory(@RequestBody Category category) {
+    public ApiResponse<Category> createCategory(@Valid @RequestBody Category category) {
         return ApiResponse.success("Category created successfully", categoryService.createCategory(category));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<Category> updateCategory(@PathVariable Long id, @RequestBody Category category) {
+    public ApiResponse<Category> updateCategory(@PathVariable Long id, @Valid @RequestBody Category category) {
         return ApiResponse.success("Category updated successfully", categoryService.updateCategory(id, category));
     }
 

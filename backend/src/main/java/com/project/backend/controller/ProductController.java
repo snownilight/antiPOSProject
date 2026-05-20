@@ -3,6 +3,7 @@ package com.project.backend.controller;
 import com.project.backend.common.ApiResponse;
 import com.project.backend.entity.Product;
 import com.project.backend.service.ProductService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/products")
-@CrossOrigin(origins = "http://localhost:5173")
 public class ProductController {
 
     @Autowired
@@ -28,12 +28,12 @@ public class ProductController {
     }
 
     @PostMapping
-    public ApiResponse<Product> createProduct(@RequestBody Product product) {
+    public ApiResponse<Product> createProduct(@Valid @RequestBody Product product) {
         return ApiResponse.success("Product created successfully", productService.createProduct(product));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<Product> updateProduct(@PathVariable Long id, @RequestBody Product product) {
+    public ApiResponse<Product> updateProduct(@PathVariable Long id, @Valid @RequestBody Product product) {
         return ApiResponse.success("Product updated successfully", productService.updateProduct(id, product));
     }
 

@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react';
 import { Modal, Form } from 'react-bootstrap';
+import API_BASE_URL from '../../utils/api';
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
@@ -20,7 +21,7 @@ const ProductList = () => {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('http://localhost:8081/api/categories');
+      const res = await fetch(`${API_BASE_URL}/categories`);
       const json = await res.json();
       if (json.code === 200) setCategories(json.data);
     } catch (e) { console.error(e); }
@@ -29,8 +30,8 @@ const ProductList = () => {
   const fetchProducts = async () => {
     try {
       const url = filterCategoryId 
-        ? `http://localhost:8081/api/products?categoryId=${filterCategoryId}`
-        : 'http://localhost:8081/api/products';
+        ? `${API_BASE_URL}/products?categoryId=${filterCategoryId}`
+        : `${API_BASE_URL}/products`;
       const res = await fetch(url);
       const json = await res.json();
       if (json.code === 200) setProducts(json.data);
@@ -71,8 +72,8 @@ const ProductList = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const url = editingProduct 
-      ? `http://localhost:8081/api/products/${editingProduct.id}`
-      : 'http://localhost:8081/api/products';
+      ? `${API_BASE_URL}/products/${editingProduct.id}`
+      : `${API_BASE_URL}/products`;
     const method = editingProduct ? 'PUT' : 'POST';
 
     try {
@@ -91,14 +92,14 @@ const ProductList = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('確定要刪除此商品嗎？')) return;
     try {
-      const res = await fetch(`http://localhost:8081/api/products/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE_URL}/products/${id}`, { method: 'DELETE' });
       if (res.ok) fetchProducts();
     } catch (e) { console.error(e); }
   };
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      const res = await fetch(`http://localhost:8081/api/products/${id}/status`, {
+      const res = await fetch(`${API_BASE_URL}/products/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })

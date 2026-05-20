@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react';
 import { Modal, Form } from 'react-bootstrap';
+import API_BASE_URL from '../../utils/api';
 
 const CategoryList = () => {
   const [categories, setCategories] = useState([]);
@@ -10,7 +11,7 @@ const CategoryList = () => {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('http://localhost:8081/api/categories');
+      const res = await fetch(`${API_BASE_URL}/categories`);
       const json = await res.json();
       if (json.code === 200) {
         setCategories(json.data);
@@ -41,8 +42,8 @@ const CategoryList = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const url = editingCategory 
-      ? `http://localhost:8081/api/categories/${editingCategory.id}`
-      : 'http://localhost:8081/api/categories';
+      ? `${API_BASE_URL}/categories/${editingCategory.id}`
+      : `${API_BASE_URL}/categories`;
     const method = editingCategory ? 'PUT' : 'POST';
 
     try {
@@ -63,7 +64,7 @@ const CategoryList = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('確定要刪除此分類嗎？')) return;
     try {
-      const res = await fetch(`http://localhost:8081/api/categories/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {

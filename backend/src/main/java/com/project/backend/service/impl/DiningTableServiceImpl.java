@@ -4,15 +4,24 @@ import com.project.backend.entity.DiningTable;
 import com.project.backend.mapper.DiningTableMapper;
 import com.project.backend.service.DiningTableService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Service
 public class DiningTableServiceImpl implements DiningTableService {
 
     @Autowired
     private DiningTableMapper diningTableMapper;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     private static final List<String> VALID_STATUSES = Arrays.asList("EMPTY", "OCCUPIED", "CLEANING");
 
@@ -50,7 +59,11 @@ public class DiningTableServiceImpl implements DiningTableService {
             throw new RuntimeException("Invalid table status: " + table.getStatus());
         }
         diningTableMapper.update(table);
-        return diningTableMapper.findById(id);
+        DiningTable updated = diningTableMapper.findById(id);
+        if (table.getStatus() != null && !table.getStatus().equals(existing.getStatus())) {
+            broadcastTableStatusChanged(updated, existing.getStatus());
+        }
+        return updated;
     }
 
     @Override
@@ -72,6 +85,20 @@ public class DiningTableServiceImpl implements DiningTableService {
         updateObj.setId(id);
         updateObj.setStatus(status);
         diningTableMapper.update(updateObj);
-        return diningTableMapper.findById(id);
+        DiningTable updated = diningTableMapper.findById(id);
+        broadcastTableStatusChanged(updated, existing.getStatus());
+        return updated;
+    }
+
+    private void broadcastTableStatusChanged(DiningTable table, String previousStatus) {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("event", "TABLE_STATUS_CHANGED");
+        event.put("tableId", table.getId());
+        event.put("tableName", table.getName());
+        event.put("status", table.getStatus());
+        event.put("previousStatus", previousStatus);
+        event.put("timestamp", LocalDateTime.now(ZoneId.of("Asia/Taipei"))
+                .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+        messagingTemplate.convertAndSend("/topic/orders", event);
     }
 }

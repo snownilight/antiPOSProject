@@ -1,8 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, Form, Spinner } from 'react-bootstrap';
 import API_BASE_URL from '../../utils/api';
+import useWebSocket from '../../hooks/useWebSocket';
 
 const TableList = () => {
   const navigate = useNavigate();
@@ -35,6 +36,12 @@ const TableList = () => {
   useEffect(() => {
     fetchTables();
   }, []);
+
+  // WebSocket 即時更新：收到訂單事件時自動刷新桌台狀態 (POS-33)
+  useWebSocket('/topic/orders', useCallback((event) => {
+    console.log('[TableList] 收到 WebSocket 事件:', event);
+    fetchTables();
+  }, []));
 
   const handleClose = () => {
     setShowModal(false);

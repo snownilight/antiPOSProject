@@ -63,6 +63,17 @@
   - **狀態流轉**：更新訂單狀態為 `PAID`，且結帳後桌台狀態將直接連動變更為 `CLEANING`（清潔中）。後續由服務生確認清潔完成後手動改回 `EMPTY`（空閒）。
 - **前端結帳介面整合與異常防護**：修改 [TableList.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/TableList.jsx) 的結帳流程，移除直接對狀態欄位進行 PATCH 的作法，改為呼叫新的 POST 結帳端點。另外，實作**錯誤回復與狀態自癒重整機制**，在結帳異常時自動拉取桌台最新的 `PENDING` 訂單清單，避免後續再次點擊時因重複呼叫已結帳成功的訂單而導致顯示「已結帳過」的衝突問題。
 
+### 6. WebSocket 即時通訊 (Jira: POS-33)
+- **後端 WebSocket 基礎建設 (POS-34)**：
+  - 新增 `spring-boot-starter-websocket` 依賴至 [pom.xml](file:///d:/Learing/project/antiPOSProject/backend/pom.xml)。
+  - 新增 [WebSocketConfig.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/common/WebSocketConfig.java)：啟用 `@EnableWebSocketMessageBroker`，設定 STOMP endpoint `/ws`（含 SockJS fallback）、Simple Broker `/topic`、Application Prefix `/app`。CORS 來源與 REST API 共用 `cors.allowed-origins` 設定。
+- **訂單事件即時廣播 (POS-35)**：
+  - 新增 [OrderEventDTO.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/dto/OrderEventDTO.java)：廣播事件 DTO（含 `event`、`orderId`、`orderNo`、`tableName`、`tableId`、`status`、`timestamp`）。
+  - 修改 [OrderServiceImpl.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/service/impl/OrderServiceImpl.java)：注入 `SimpMessagingTemplate`，於訂單新增（`ORDER_CREATED`）、狀態更新（`ORDER_STATUS_CHANGED`）及結帳（`ORDER_STATUS_CHANGED`）三處自動廣播至 `/topic/orders`。
+- **前端 WebSocket 即時訂閱 (POS-36)**：
+  - 安裝 `@stomp/stompjs` 與 `sockjs-client` 前端依賴。
+  - 新增 [useWebSocket.js](file:///d:/Learing/project/antiPOSProject/frontend/src/hooks/useWebSocket.js) 自訂 React Hook：封裝 STOMP over SockJS 連線管理，支援自動重連（5 秒延遲）、元件 unmount 自動斷線。
+  - 修改 [TableList.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/TableList.jsx) 及 [OrderInterface.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/OrderInterface.jsx)：訂閱 `/topic/orders`，收到事件時自動刷新桌台狀態，實現桌台卡片配色（🟢🔴🟡）即時更新。
 ---
 
 ## 🧪 測試與驗證資源
@@ -70,6 +81,7 @@
   - 桌台、商品與分類模組測試：`C:\Users\snown\.gemini\antigravity-ide\scratch\test_e2e.js` (包含 SQL 注入防護、XSS 攻擊阻擋等共 **76 項 API 邊緣條件測試皆 100% 通過**)。
   - 訂單系統模組測試：`C:\Users\snown\.gemini\antigravity-ide\brain\1df2973f-ed92-47fb-831a-2642f728deec\scratch\test_orders.js` (包含 15 碼自定義訂單編號格式、排除混淆字元、桌台狀態雙向連動、刪除限制與售罄驗證等 **8 大核心情境皆 100% 通過**)。
   - 結帳功能模組測試：`C:\Users\snown\.gemini\antigravity-ide\scratch\test_checkout.js` (包含重複結帳阻擋、明細加總計算、一桌多單之桌台狀態切換等，測試皆 100% 通過)。
+  - WebSocket 即時通訊模組測試：`C:\Users\snown\.gemini\antigravity-ide\brain\bd1b8c98-dc4d-4591-892e-cdbb46697d1a\scratch\test_websocket.js` (包含 SockJS 連線、STOMP 握手、ORDER_CREATED/ORDER_STATUS_CHANGED 事件廣播、延遲驗證等 **17 項全部 100% 通過，廣播延遲 25ms**)。
 - **Postman 匯入檔**：
   - 位置：[postman/antiPOS_API_Collection.json](file:///d:/Learing/project/antiPOSProject/postman/antiPOS_API_Collection.json)
   - 包含：全模組（分類、商品、桌台、訂單）共計 **62 個 API 測試案例**。
@@ -77,4 +89,9 @@
 ---
 
 ## 🌿 Git 分支狀態
-- 當前分支：`dev` (已合併 POS-23 結帳 API 與 UI 整合)。
+- 當前分支：`POS-33` (WebSocket 即時通訊，基於 `dev` 分支建立)。
+
+## POS-33 Follow-up: Table Status WebSocket
+- Updated [DiningTableServiceImpl.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/service/impl/DiningTableServiceImpl.java) to publish `TABLE_STATUS_CHANGED` to `/topic/orders` whenever a table status actually changes.
+- This covers direct table status updates such as `CLEANING` -> `EMPTY` after cleaning is complete, so other connected clients refresh their table state immediately.
+- Event payload includes `event`, `tableId`, `tableName`, `status`, `previousStatus`, and `timestamp`.

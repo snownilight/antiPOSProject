@@ -700,6 +700,140 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Order（訂單系統）",
+      "item": [
+        {
+          "name": "正常流程",
+          "item": [
+            {
+              "name": "取得所有訂單",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/orders"
+              }
+            },
+            {
+              "name": "取得單筆訂單",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/orders/1"
+              }
+            },
+            {
+              "name": "新增訂單",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/orders",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"tableId\": 1,\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 2,\n      \"note\": \"少油\"\n    },\n    {\n      \"productId\": 3,\n      \"quantity\": 1,\n      \"note\": \"\"\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "name": "透過訂單編號取得單筆訂單",
+              "request": {
+                "method": "GET",
+                "url": "{{baseUrl}}/orders/no/TW-260521-E3K8R"
+              }
+            },
+            {
+              "name": "更新訂單狀態 → PAID",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/orders/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"PAID\"\n}"
+                }
+              }
+            },
+            {
+              "name": "更新訂單狀態 → CANCELLED",
+              "request": {
+                "method": "PATCH",
+                "url": "{{baseUrl}}/orders/1/status",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"CANCELLED\"\n}"
+                }
+              }
+            },
+            {
+              "name": "刪除訂單（軟刪除）",
+              "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/orders/1"
+              }
+            }
+          ]
+        },
+        {
+          "name": "邊緣條件",
+          "item": [
+            {
+              "name": "❌ 缺少 tableId → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/orders",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"quantity\": 1\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 缺少 items 清單 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/orders",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"tableId\": 1,\n  \"items\": []\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 購買已售罄商品 → 400",
+              "request": {
+                "method": "POST",
+                "url": "{{baseUrl}}/orders",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"tableId\": 1,\n  \"items\": [\n    {\n      \"productId\": 4,\n      \"quantity\": 1\n    }\n  ]\n}"
+                }
+              }
+            },
+            {
+              "name": "❌ 刪除未付款的活動中訂單 → 400",
+              "request": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/orders/1"
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

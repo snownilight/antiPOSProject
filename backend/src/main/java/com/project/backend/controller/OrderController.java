@@ -1,0 +1,64 @@
+package com.project.backend.controller;
+
+import com.project.backend.common.ApiResponse;
+import com.project.backend.dto.OrderCreateRequest;
+import com.project.backend.entity.Order;
+import com.project.backend.service.OrderService;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/orders")
+public class OrderController {
+
+    @Autowired
+    private OrderService orderService;
+
+    @PostMapping
+    public ApiResponse<Order> createOrder(@Valid @RequestBody OrderCreateRequest request) {
+        Order createdOrder = orderService.createOrder(request);
+        return ApiResponse.success("Order created successfully", createdOrder);
+    }
+
+    @GetMapping
+    public ApiResponse<List<Order>> getAllOrders(
+            @RequestParam(required = false) Long tableId,
+            @RequestParam(required = false) String status) {
+        List<Order> orders = orderService.getAllActiveOrders(tableId, status);
+        return ApiResponse.success(orders);
+    }
+
+    @GetMapping("/{id}")
+    public ApiResponse<Order> getOrderById(@PathVariable Long id) {
+        Order order = orderService.getOrderById(id);
+        return ApiResponse.success(order);
+    }
+
+    @GetMapping("/no/{orderNo}")
+    public ApiResponse<Order> getOrderByOrderNo(@PathVariable String orderNo) {
+        Order order = orderService.getOrderByOrderNo(orderNo);
+        return ApiResponse.success(order);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ApiResponse<Order> updateOrderStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+        String status = body.get("status");
+        if (status == null || status.trim().isEmpty()) {
+            return ApiResponse.error(400, "Status is required");
+        }
+        Order updatedOrder = orderService.updateOrderStatus(id, status.trim());
+        return ApiResponse.success("Order status updated to " + status, updatedOrder);
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> deleteOrder(@PathVariable Long id) {
+        orderService.deleteOrder(id);
+        return ApiResponse.success("Order deleted successfully", null);
+    }
+}

@@ -1,0 +1,22 @@
+package com.project.backend.entity;
+
+import lombok.Data;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+public class Order {
+    private Long id;
+    private Long tableId;
+    private String orderNo;
+    private BigDecimal totalAmount;
+    private String status; // PENDING, PAID, CANCELLED
+    private Boolean isDeleted;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    // Relation fields
+    private List<OrderItem> items;
+    private String tableName; // Table name populated by join queries
+}

@@ -1,3 +1,10 @@
+<!-- 
+[AI 讀寫規範]：
+每次更新此檔案時，請嚴格保持以下結構：
+1. 目前架構/功能現況
+2. 已完成的工單與變更 (請附上日期與工單號)
+-->
+
 # antiPOS 專案開發進度總結 (Working Summary)
 
 ## 📌 環境設定與連線資訊
@@ -26,18 +33,27 @@
   - 新增/編輯彈窗及軟刪除提示。
 - **路由配置**：在 `App.jsx` 配置 `/admin/tables`，並在 `ProductDashboard.jsx` 側邊欄加入連結。
 
+### 3. 後端訂單系統 API (Jira: POS-21)
+- **實作內容**：`Order` 與 `OrderItem` 的完整 CRUD、狀態變更與聯表查詢明細 API (`/api/orders`)。
+- **編號產生規則**：固定 15 碼 `TW-YYMMDD-XXXXX`（時區強制為 UTC+8 台北時間，後 5 碼隨機流水號排除易混淆字元 `I`, `O`, `L`, `U`）。
+- **桌台狀態自動連動**：
+  - 允許單一桌台重複開立多筆 `PENDING` 訂單。
+  - 新增訂單：桌台狀態自動連動轉為 `OCCUPIED` (用餐中)。
+  - 訂單付款：狀態變為 `PAID`，桌台連動更新為 `CLEANING` (清潔中)。
+  - 訂單取消：狀態變為 `CANCELLED`，若該桌台無其他活動中的 `PENDING` 訂單，則連動還原桌台為 `EMPTY` (空閒)。
+- **安全與業務驗證**：自動阻擋購買已下架或已售完（`SOLD_OUT`/`HIDDEN`）的商品，且未付款的活動中訂單不允許直接刪除。
+
 ---
 
 ## 🧪 測試與驗證資源
 - **自動化 E2E 測試**：
-  - 腳本位置：`C:\Users\snown\.gemini\antigravity-ide\scratch\test_e2e.js`
-  - 測試結果：全模組 (Category, Product, Table) 包含 SQL 注入防護、XSS 攻擊阻擋等共 **76 項 API 邊緣條件測試皆 100% 通過**。
+  - 桌台、商品與分類模組測試：`C:\Users\snown\.gemini\antigravity-ide\scratch\test_e2e.js` (包含 SQL 注入防護、XSS 攻擊阻擋等共 **76 項 API 邊緣條件測試皆 100% 通過**)。
+  - 訂單系統模組測試：`C:\Users\snown\.gemini\antigravity-ide\brain\1df2973f-ed92-47fb-831a-2642f728deec\scratch\test_orders.js` (包含 15 碼自定義訂單編號格式、排除混淆字元、桌台狀態雙向連動、刪除限制與售罄驗證等 **8 大核心情境皆 100% 通過**)。
 - **Postman 匯入檔**：
   - 位置：[postman/antiPOS_API_Collection.json](file:///d:/Learing/project/antiPOSProject/postman/antiPOS_API_Collection.json)
-  - 包含：全模組共 51 個 API 測試案例。
+  - 包含：全模組（分類、商品、桌台、訂單）共計 **62 個 API 測試案例**。
 
 ---
 
 ## 🌿 Git 分支狀態
-- 當前分支：`dev` (工作區完全乾淨，已將 `POS-14` 與 `POS-18` 功能分支安全合併至此)。
-- 本地 commit 領先 origin/dev，待 push 遠端。
+- 當前分支：`POS-21` (開發中分支，包含訂單系統相關功能與測試案例，工作區狀態已移至此分支)。

@@ -31,3 +31,17 @@ INSERT IGNORE INTO dining_table (id, name, seats, status) VALUES (1, 'T1', 2, 'E
 INSERT IGNORE INTO dining_table (id, name, seats, status) VALUES (2, 'T2', 2, 'EMPTY');
 INSERT IGNORE INTO dining_table (id, name, seats, status) VALUES (3, 'T3', 4, 'OCCUPIED');
 INSERT IGNORE INTO dining_table (id, name, seats, status) VALUES (4, 'T4', 6, 'CLEANING');
+
+-- Insert default orders
+INSERT IGNORE INTO orders (id, table_id, order_no, total_amount, status) VALUES (1, 3, 'TW-260521-A1B2C', 100.00, 'PENDING');
+INSERT IGNORE INTO orders (id, table_id, order_no, total_amount, status) VALUES (2, 1, 'TW-260521-D4E5F', 140.00, 'PAID');
+
+-- Insert default order items
+INSERT IGNORE INTO order_item (id, order_id, product_id, product_name, price, quantity, subtotal, note) 
+VALUES (1, 1, 1, '招牌滷肉飯', 50.00, 2, 100.00, '少油');
+
+INSERT IGNORE INTO order_item (id, order_id, product_id, product_name, price, quantity, subtotal, note) 
+VALUES (2, 2, 2, '香酥排骨飯', 90.00, 1, 90.00, NULL);
+INSERT IGNORE INTO order_item (id, order_id, product_id, product_name, price, quantity, subtotal, note) 
+VALUES (3, 2, 1, '招牌滷肉飯', 50.00, 1, 50.00, NULL);
+

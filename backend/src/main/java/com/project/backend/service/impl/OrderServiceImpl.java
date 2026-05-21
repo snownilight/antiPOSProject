@@ -1,6 +1,7 @@
 package com.project.backend.service.impl;
 
 import com.project.backend.dto.OrderCreateRequest;
+import com.project.backend.dto.OrderEventDTO;
 import com.project.backend.dto.OrderItemCreateRequest;
 import com.project.backend.entity.DiningTable;
 import com.project.backend.entity.Order;
@@ -11,11 +12,13 @@ import com.project.backend.service.DiningTableService;
 import com.project.backend.service.OrderService;
 import com.project.backend.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -34,6 +37,9 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     private DiningTableService diningTableService;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
 
     private static final List<String> VALID_ORDER_STATUSES = Arrays.asList("PENDING", "PAID", "CANCELLED");
 
@@ -102,7 +108,12 @@ public class OrderServiceImpl implements OrderService {
             diningTableService.updateTableStatus(request.getTableId(), "OCCUPIED");
         }
 
-        return getOrderById(order.getId());
+        Order createdOrder = getOrderById(order.getId());
+
+        // 7. 廣播 WebSocket 事件 (POS-33)
+        broadcastOrderEvent("ORDER_CREATED", createdOrder);
+
+        return createdOrder;
     }
 
     @Override
@@ -163,7 +174,12 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        return getOrderById(id);
+        Order updatedOrder = getOrderById(id);
+
+        // 廣播 WebSocket 事件 (POS-33)
+        broadcastOrderEvent("ORDER_STATUS_CHANGED", updatedOrder);
+
+        return updatedOrder;
     }
     
     @Override
@@ -189,8 +205,13 @@ public class OrderServiceImpl implements OrderService {
         
         // 3. 桌台狀態連動邏輯
         diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
-        
-        return getOrderById(id);
+
+        Order checkedOutOrder = getOrderById(id);
+
+        // 4. 廣播 WebSocket 事件 (POS-33)
+        broadcastOrderEvent("ORDER_STATUS_CHANGED", checkedOutOrder);
+
+        return checkedOutOrder;
     }
 
     @Override
@@ -226,5 +247,24 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return prefix + "-" + dateStr + "-" + sb.toString();
+    }
+
+    /**
+     * 廣播訂單事件至 WebSocket 客戶端 (POS-33)
+     * @param event 事件類型 (ORDER_CREATED / ORDER_STATUS_CHANGED)
+     * @param order 訂單資料
+     */
+    private void broadcastOrderEvent(String event, Order order) {
+        OrderEventDTO dto = OrderEventDTO.builder()
+                .event(event)
+                .orderId(order.getId())
+                .orderNo(order.getOrderNo())
+                .tableName(order.getTableName())
+                .tableId(order.getTableId())
+                .status(order.getStatus())
+                .timestamp(LocalDateTime.now(ZoneId.of("Asia/Taipei"))
+                        .format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
+                .build();
+        messagingTemplate.convertAndSend("/topic/orders", dto);
     }
 }

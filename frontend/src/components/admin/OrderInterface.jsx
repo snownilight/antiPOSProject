@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import API_BASE_URL from '../../utils/api';
+import useWebSocket from '../../hooks/useWebSocket';
 
 const OrderInterface = () => {
   const [searchParams] = useSearchParams();
@@ -23,18 +24,26 @@ const OrderInterface = () => {
 
 
 
+  const fetchTables = async () => {
+    try {
+      const resTables = await fetch(`${API_BASE_URL}/tables`);
+      const jsonTables = await resTables.json();
+      if (jsonTables.code === 200) {
+        setTables(jsonTables.data);
+      } else {
+        setErrorMsg(jsonTables.message || '載入桌台資料失敗');
+      }
+    } catch (e) {
+      console.error('Error loading tables:', e);
+    }
+  };
+
   // 1. 取得桌台、分類與商品資訊
   useEffect(() => {
     const fetchData = async () => {
       try {
         // 桌台
-        const resTables = await fetch(`${API_BASE_URL}/tables`);
-        const jsonTables = await resTables.json();
-        if (jsonTables.code === 200) {
-          setTables(jsonTables.data);
-        } else {
-          setErrorMsg(jsonTables.message || '載入桌台資料失敗');
-        }
+        await fetchTables();
 
         // 分類
         const resCategories = await fetch(`${API_BASE_URL}/categories`);
@@ -63,6 +72,12 @@ const OrderInterface = () => {
 
     fetchData();
   }, []);
+
+  // WebSocket 即時更新：收到訂單事件時自動刷新桌台狀態 (POS-33)
+  useWebSocket('/topic/orders', useCallback((event) => {
+    console.log('[OrderInterface] 收到 WebSocket 事件:', event);
+    fetchTables();
+  }, []));
 
   // 自動清理任何可能殘留的 Modal Backdrop，保障 SPA 路由切換事件穿透安全
   useEffect(() => {

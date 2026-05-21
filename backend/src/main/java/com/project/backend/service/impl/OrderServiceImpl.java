@@ -165,6 +165,40 @@ public class OrderServiceImpl implements OrderService {
 
         return getOrderById(id);
     }
+    
+    @Override
+    @Transactional
+    public Order checkoutOrder(Long id) {
+        Order order = getOrderById(id);
+        
+        if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
+            throw new IllegalArgumentException("訂單已結帳或已取消，無法重複結帳");
+        }
+        
+        // 1. 計算金額
+        List<OrderItem> items = orderMapper.findItemsByOrderId(id);
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        for (OrderItem item : items) {
+            totalAmount = totalAmount.add(item.getSubtotal());
+        }
+        order.setTotalAmount(totalAmount);
+        
+        // 2. 更新狀態為 PAID
+        order.setStatus("PAID");
+        orderMapper.update(order);
+        
+        // 3. 桌台狀態連動邏輯
+        List<Order> activeOrders = orderMapper.findAllActive(order.getTableId(), "PENDING");
+        boolean hasOtherPending = activeOrders.stream()
+                .anyMatch(o -> !o.getId().equals(order.getId()));
+        if (!hasOtherPending) {
+            diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
+        } else {
+            diningTableService.updateTableStatus(order.getTableId(), "OCCUPIED");
+        }
+        
+        return getOrderById(id);
+    }
 
     @Override
     @Transactional

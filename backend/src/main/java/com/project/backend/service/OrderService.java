@@ -10,5 +10,6 @@ public interface OrderService {
     Order getOrderByOrderNo(String orderNo);
     List<Order> getAllActiveOrders(Long tableId, String status);
     Order updateOrderStatus(Long id, String status);
+    Order checkoutOrder(Long id);
     void deleteOrder(Long id);
 }

@@ -133,12 +133,11 @@ const TableList = () => {
     setCheckoutError('');
     try {
       if (checkoutOrders.length > 0) {
-        // 將所有 PENDING 訂單更新為 PAID
+        // 呼叫後端結帳 API
         const checkoutPromises = checkoutOrders.map(order => 
-          fetch(`${API_BASE_URL}/orders/${order.id}/status`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'PAID' })
+          fetch(`${API_BASE_URL}/orders/${order.id}/checkout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
           }).then(async r => {
             const json = await r.json();
             if (!r.ok || json.code !== 200) {

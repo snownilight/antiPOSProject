@@ -56,6 +56,12 @@ public class OrderController {
         return ApiResponse.success("Order status updated to " + status, updatedOrder);
     }
 
+    @PostMapping("/{id}/checkout")
+    public ApiResponse<Order> checkoutOrder(@PathVariable Long id) {
+        Order checkedOutOrder = orderService.checkoutOrder(id);
+        return ApiResponse.success("Order checked out successfully", checkedOutOrder);
+    }
+
     @DeleteMapping("/{id}")
     public ApiResponse<Void> deleteOrder(@PathVariable Long id) {
         orderService.deleteOrder(id);

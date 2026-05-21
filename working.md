@@ -49,12 +49,20 @@
 - **多訂單合併結帳與付款**：對 `OCCUPIED` 桌台點擊「結帳」，會拉取該桌台所有的 `PENDING` 訂單，於彈窗中展示消費明細並合併計價。確認付款後併行將訂單改為 `PAID`，使桌台由後端連動轉為 `CLEANING`。
 - **容錯與重置**：對於 `OCCUPIED` 桌台查無訂單的情境，提供「手動設為清潔中」的安全回退機制。
 
+### 5. 專用結帳功能 (Jira: POS-23)
+- **後端專用結帳 API**：新增 `POST /api/orders/{id}/checkout` 端點。
+  - **金額計算**：自動重新加總該訂單所有 `OrderItem` 的 `subtotal` 以確保金額一致。
+  - **狀態流轉**：更新訂單狀態為 `PAID`，並連動更新桌台狀態。
+  - **多訂單桌台狀態判定**：若該桌台無其他 `PENDING` 訂單，桌台將轉為 `CLEANING`（清潔中）；否則維持 `OCCUPIED`（使用中）。
+- **前端結帳介面整合**：修改 [TableList.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/TableList.jsx) 的結帳流程，移除直接對狀態欄位進行 PATCH 的作法，改為呼叫新的 POST 結帳端點，提升架構高內聚性與業務封裝性。
+
 ---
 
 ## 🧪 測試與驗證資源
 - **自動化 E2E 測試**：
   - 桌台、商品與分類模組測試：`C:\Users\snown\.gemini\antigravity-ide\scratch\test_e2e.js` (包含 SQL 注入防護、XSS 攻擊阻擋等共 **76 項 API 邊緣條件測試皆 100% 通過**)。
   - 訂單系統模組測試：`C:\Users\snown\.gemini\antigravity-ide\brain\1df2973f-ed92-47fb-831a-2642f728deec\scratch\test_orders.js` (包含 15 碼自定義訂單編號格式、排除混淆字元、桌台狀態雙向連動、刪除限制與售罄驗證等 **8 大核心情境皆 100% 通過**)。
+  - 結帳功能模組測試：`C:\Users\snown\.gemini\antigravity-ide\scratch\test_checkout.js` (包含重複結帳阻擋、明細加總計算、一桌多單之桌台狀態切換等，測試皆 100% 通過)。
 - **Postman 匯入檔**：
   - 位置：[postman/antiPOS_API_Collection.json](file:///d:/Learing/project/antiPOSProject/postman/antiPOS_API_Collection.json)
   - 包含：全模組（分類、商品、桌台、訂單）共計 **62 個 API 測試案例**。
@@ -62,4 +70,4 @@
 ---
 
 ## 🌿 Git 分支狀態
-- 當前分支：`dev` (已完成 POS-22 外場點餐介面與結帳流程合併)。
+- 當前分支：`POS-23` (已完成 POS-23 結帳 API 與 UI 整合)。

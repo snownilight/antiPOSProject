@@ -8,8 +8,10 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -27,8 +29,24 @@ public class OrderController {
     @GetMapping
     public ApiResponse<List<Order>> getAllOrders(
             @RequestParam(required = false) Long tableId,
-            @RequestParam(required = false) String status) {
-        List<Order> orders = orderService.getAllActiveOrders(tableId, status);
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String statuses) {
+        List<Order> orders;
+        if (statuses != null && !statuses.trim().isEmpty()) {
+            List<String> statusList = Arrays.stream(statuses.split(","))
+                    .map(String::trim)
+                    .filter(value -> !value.isEmpty())
+                    .collect(Collectors.toList());
+            orders = orderService.getAllActiveOrders(tableId, statusList);
+        } else {
+            orders = orderService.getAllActiveOrders(tableId, status);
+        }
+        return ApiResponse.success(orders);
+    }
+
+    @GetMapping("/kitchen")
+    public ApiResponse<List<Order>> getKitchenOrders() {
+        List<Order> orders = orderService.getKitchenOrders();
         return ApiResponse.success(orders);
     }
 

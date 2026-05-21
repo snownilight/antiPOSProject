@@ -11,7 +11,7 @@ public class Order {
     private Long tableId;
     private String orderNo;
     private BigDecimal totalAmount;
-    private String status; // PENDING, PAID, CANCELLED
+    private String status; // PENDING, PREPARING, READY, PAID, CANCELLED
     private Boolean isDeleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

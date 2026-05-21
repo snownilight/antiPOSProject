@@ -9,6 +9,8 @@ public interface OrderService {
     Order getOrderById(Long id);
     Order getOrderByOrderNo(String orderNo);
     List<Order> getAllActiveOrders(Long tableId, String status);
+    List<Order> getAllActiveOrders(Long tableId, List<String> statuses);
+    List<Order> getKitchenOrders();
     Order updateOrderStatus(Long id, String status);
     Order checkoutOrder(Long id);
     void deleteOrder(Long id);

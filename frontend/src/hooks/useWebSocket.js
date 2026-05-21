@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 
@@ -17,10 +17,13 @@ export default function useWebSocket(topic, onMessage) {
     const clientRef = useRef(null);
     // 使用 ref 保存最新的 onMessage，避免重新連線
     const onMessageRef = useRef(onMessage);
-    onMessageRef.current = onMessage;
 
     const stableTopic = useRef(topic);
-    stableTopic.current = topic;
+
+    useEffect(() => {
+        onMessageRef.current = onMessage;
+        stableTopic.current = topic;
+    }, [topic, onMessage]);
 
     useEffect(() => {
         const client = new Client({

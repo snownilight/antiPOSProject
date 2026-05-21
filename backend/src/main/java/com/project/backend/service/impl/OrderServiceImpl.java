@@ -188,14 +188,7 @@ public class OrderServiceImpl implements OrderService {
         orderMapper.update(order);
         
         // 3. 桌台狀態連動邏輯
-        List<Order> activeOrders = orderMapper.findAllActive(order.getTableId(), "PENDING");
-        boolean hasOtherPending = activeOrders.stream()
-                .anyMatch(o -> !o.getId().equals(order.getId()));
-        if (!hasOtherPending) {
-            diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
-        } else {
-            diningTableService.updateTableStatus(order.getTableId(), "OCCUPIED");
-        }
+        diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
         
         return getOrderById(id);
     }

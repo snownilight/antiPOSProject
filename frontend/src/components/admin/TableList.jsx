@@ -17,6 +17,8 @@ const TableList = () => {
   const [checkoutOrders, setCheckoutOrders] = useState([]);
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [checkoutError, setCheckoutError] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const fetchTables = async () => {
     try {
@@ -133,35 +135,52 @@ const TableList = () => {
     setCheckoutError('');
     try {
       if (checkoutOrders.length > 0) {
-        // 呼叫後端結帳 API
-        const checkoutPromises = checkoutOrders.map(order => 
-          fetch(`${API_BASE_URL}/orders/${order.id}/checkout`, {
+        // 呼叫後端結帳 API (採序列化方式防範資料庫併發鎖衝突)
+        for (const order of checkoutOrders) {
+          const r = await fetch(`${API_BASE_URL}/orders/${order.id}/checkout`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
-          }).then(async r => {
-            const json = await r.json();
-            if (!r.ok || json.code !== 200) {
-              throw new Error(json.message || `訂單 ${order.orderNo} 結帳失敗`);
-            }
-            return json.data;
-          })
-        );
-        await Promise.all(checkoutPromises);
-        alert(`桌台 ${checkoutTable.name} 結帳付款成功！`);
+          });
+          const json = await r.json();
+          if (!r.ok || json.code !== 200) {
+            throw new Error(json.message || `訂單 ${order.orderNo} 結帳失敗`);
+          }
+        }
+        setSuccessMessage(`桌台 ${checkoutTable.name} 結帳付款成功！`);
+        setShowSuccessModal(true);
+        setShowCheckout(false); // 隱藏結帳確認彈窗，避免多個彈窗重疊
       } else {
         // 容錯：若無訂單，詢問是否直接轉為清潔中
         if (window.confirm('此桌台無活動中訂單。是否手動將其設為清潔中？')) {
           await handleStatusChange(checkoutTable.id, 'CLEANING');
         }
+        fetchTables();
+        handleCloseCheckout();
       }
-      fetchTables();
-      handleCloseCheckout();
     } catch (e) {
       console.error(e);
       setCheckoutError(e.message || '結帳失敗，請重試。');
+      // 結帳出錯時，重新拉取最新的未結帳訂單，避免後續再次點擊時重複結帳已付款的訂單
+      if (checkoutTable) {
+        try {
+          const r = await fetch(`${API_BASE_URL}/orders?tableId=${checkoutTable.id}&status=PENDING`);
+          const json = await r.json();
+          if (r.ok && json.code === 200) {
+            setCheckoutOrders(json.data);
+          }
+        } catch (err) {
+          console.error('Failed to refresh orders after error:', err);
+        }
+      }
     } finally {
       setLoadingCheckout(false);
     }
+  };
+
+  const handleSuccessModalConfirm = () => {
+    setShowSuccessModal(false);
+    fetchTables();
+    handleCloseCheckout();
   };
 
   const getStatusLabel = (status) => {
@@ -192,7 +211,8 @@ const TableList = () => {
   };
 
   return (
-    <div className="glass-panel">
+    <>
+      <div className="glass-panel">
       {/* Custom Styles Injection */}
       <style>{`
         .table-grid {
@@ -533,7 +553,25 @@ const TableList = () => {
           )}
         </Modal.Footer>
       </Modal>
-    </div>
+      </div>
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="custom-modal-overlay">
+          <div className="custom-modal-content">
+            <div className="success-icon-wrapper">
+              <i className="bi bi-check-circle-fill"></i>
+            </div>
+            <h4 className="fw-bold text-dark mb-2">結帳成功！</h4>
+            <p className="text-secondary mb-4" style={{ fontSize: '15px' }}>
+              {successMessage}
+            </p>
+            <button className="modern-btn w-100 py-2.5" onClick={handleSuccessModalConfirm}>
+              確定
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

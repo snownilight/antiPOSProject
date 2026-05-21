@@ -1,6 +1,8 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
 const ProductDashboard = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="app-container">
       {/* Sidebar */}
@@ -20,6 +22,10 @@ const ProductDashboard = () => {
           <NavLink 
             to="/admin/order" 
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate('/admin/order');
+            }}
           >
             <i className="bi bi-cart-plus"></i>
             外場點餐

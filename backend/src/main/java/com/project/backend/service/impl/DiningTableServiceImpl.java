@@ -65,6 +65,9 @@ public class DiningTableServiceImpl implements DiningTableService {
         if (status == null || !VALID_STATUSES.contains(status)) {
             throw new RuntimeException("Invalid table status: " + status);
         }
+        if (status.equals(existing.getStatus())) {
+            return existing;
+        }
         DiningTable updateObj = new DiningTable();
         updateObj.setId(id);
         updateObj.setStatus(status);

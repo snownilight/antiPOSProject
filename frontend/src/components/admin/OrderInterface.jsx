@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import API_BASE_URL from '../../utils/api';
 
@@ -7,6 +7,7 @@ const OrderInterface = () => {
   const navigate = useNavigate();
 
   const tableIdFromQuery = searchParams.get('tableId');
+  const prevTableIdRef = useRef(tableIdFromQuery);
 
   const [tables, setTables] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -17,6 +18,10 @@ const OrderInterface = () => {
   const [cart, setCart] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successInfo, setSuccessInfo] = useState({ tableName: '', orderNo: '' });
+
+
 
   // 1. 取得桌台、分類與商品資訊
   useEffect(() => {
@@ -27,9 +32,8 @@ const OrderInterface = () => {
         const jsonTables = await resTables.json();
         if (jsonTables.code === 200) {
           setTables(jsonTables.data);
-          if (tableIdFromQuery) {
-            setSelectedTableId(tableIdFromQuery);
-          }
+        } else {
+          setErrorMsg(jsonTables.message || '載入桌台資料失敗');
         }
 
         // 分類
@@ -37,6 +41,8 @@ const OrderInterface = () => {
         const jsonCategories = await resCategories.json();
         if (jsonCategories.code === 200) {
           setCategories(jsonCategories.data);
+        } else {
+          setErrorMsg(jsonCategories.message || '載入分類資料失敗');
         }
 
         // 商品
@@ -46,6 +52,8 @@ const OrderInterface = () => {
           // 只保留 AVAILABLE 的商品
           const availableProducts = jsonProducts.data.filter(p => p.status === 'AVAILABLE');
           setProducts(availableProducts);
+        } else {
+          setErrorMsg(jsonProducts.message || '載入商品資料失敗');
         }
       } catch (e) {
         console.error('Error loading data:', e);
@@ -54,6 +62,31 @@ const OrderInterface = () => {
     };
 
     fetchData();
+  }, []);
+
+  // 自動清理任何可能殘留的 Modal Backdrop，保障 SPA 路由切換事件穿透安全
+  useEffect(() => {
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    const hasBackdrop = backdrops.length > 0;
+    const isBodyModalOpen = document.body.classList.contains('modal-open');
+
+    if (hasBackdrop || isBodyModalOpen) {
+      backdrops.forEach(el => el.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.overflow = '';
+      document.body.style.paddingRight = '';
+    }
+  }, []);
+
+  // 2. 當 URL 中的 tableId 參數變更時，同步更新 selectedTableId 狀態 (防意外覆蓋防護)
+  useEffect(() => {
+    if (tableIdFromQuery) {
+      setSelectedTableId(tableIdFromQuery);
+    } else if (prevTableIdRef.current && !tableIdFromQuery) {
+      // 只有當 tableId 從有變為無時，才重設為空，避免手動切換下拉選單時被無條件蓋回空字串
+      setSelectedTableId('');
+    }
+    prevTableIdRef.current = tableIdFromQuery;
   }, [tableIdFromQuery]);
 
   // 取得目前選定的桌台名稱
@@ -139,8 +172,11 @@ const OrderInterface = () => {
       });
       const json = await res.json();
       if (res.ok && json.code === 200) {
-        alert(`桌台 ${getSelectedTableName()} 點餐成功！\n訂單編號: ${json.data.orderNo}`);
-        navigate('/admin/tables');
+        setSuccessInfo({
+          tableName: getSelectedTableName(),
+          orderNo: json.data.orderNo
+        });
+        setShowSuccessModal(true);
       } else {
         setErrorMsg(json.message || '送出訂單失敗。');
       }
@@ -152,6 +188,11 @@ const OrderInterface = () => {
     }
   };
 
+  const handleSuccessModalConfirm = () => {
+    setShowSuccessModal(false);
+    navigate('/admin/tables');
+  };
+
   // 篩選商品
   const filteredProducts = selectedCategoryId === 'ALL'
     ? products
@@ -159,6 +200,8 @@ const OrderInterface = () => {
 
   return (
     <div className="container-fluid p-0 animate-fade-in">
+
+
       {/* Styles */}
       <style>{`
         .order-layout {
@@ -179,6 +222,8 @@ const OrderInterface = () => {
           flex-direction: column;
           height: 100%;
           border-left: 1px solid rgba(255, 255, 255, 0.4);
+          position: relative;
+          z-index: 10;
         }
         .category-scroll {
           display: flex;
@@ -276,8 +321,7 @@ const OrderInterface = () => {
           color: var(--accent-color);
         }
         .cart-container {
-          background: rgba(255, 255, 255, 0.7);
-          backdrop-filter: blur(16px);
+          background: rgba(255, 255, 255, 0.6);
           border: 1px solid rgba(255, 255, 255, 0.6);
           border-radius: var(--border-radius);
           box-shadow: var(--shadow-md);
@@ -285,6 +329,18 @@ const OrderInterface = () => {
           flex-direction: column;
           height: 100%;
           overflow: hidden;
+          position: relative;
+          z-index: 1;
+        }
+        .cart-container::before {
+          content: "";
+          position: absolute;
+          top: 0; right: 0; bottom: 0; left: 0;
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
+          border-radius: inherit;
+          z-index: -1;
+          pointer-events: none;
         }
         .cart-header {
           padding: 18px 20px;
@@ -454,27 +510,29 @@ const OrderInterface = () => {
             <div className="cart-header">
               <h5 className="fw-bold text-dark mb-3"><i className="bi bi-receipt-cutoff me-2"></i>點餐清單</h5>
               
-              {tableIdFromQuery ? (
-                <div className="locked-table-badge w-100 justify-content-center">
+              {tableIdFromQuery && (
+                <div className="locked-table-badge w-100 justify-content-center mb-2">
                   <i className="bi bi-lock-fill"></i> 桌台: {getSelectedTableName()}
                 </div>
-              ) : (
-                <div>
-                  <label className="form-label text-muted mb-1" style={{fontSize: '12px'}}>選擇桌台</label>
-                  <select 
-                    className="modern-input" 
-                    value={selectedTableId}
-                    onChange={e => setSelectedTableId(e.target.value)}
-                  >
-                    <option value="">-- 請選擇桌台 --</option>
-                    {tables.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name} ({t.seats}人桌 - {t.status === 'EMPTY' ? '空閒' : t.status === 'OCCUPIED' ? '用餐中' : '清潔中'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
               )}
+              
+              <div style={{ display: tableIdFromQuery ? 'none' : 'block' }}>
+                <label className="form-label text-muted mb-1" style={{fontSize: '12px'}}>選擇桌台</label>
+                <select 
+                  className="modern-input" 
+                  value={selectedTableId}
+                  onChange={e => setSelectedTableId(e.target.value)}
+                >
+                  <option value="">
+                    {tables.length === 0 ? '資料載入中...' : '-- 請選擇桌台 --'}
+                  </option>
+                  {tables.map(t => (
+                    <option key={t.id} value={String(t.id)}>
+                      {t.name} ({t.seats}人桌 - {t.status === 'EMPTY' ? '空閒' : t.status === 'OCCUPIED' ? '用餐中' : '清潔中'})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Cart Items List */}
@@ -554,6 +612,29 @@ const OrderInterface = () => {
           </div>
         </div>
       </div>
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="custom-modal-overlay">
+          <div className="custom-modal-content">
+            <div className="success-icon-wrapper">
+              <i className="bi bi-check-circle-fill"></i>
+            </div>
+            <h4 className="fw-bold text-dark mb-2">點餐成功！</h4>
+            <p className="text-secondary mb-4" style={{ fontSize: '15px' }}>
+              桌台 <strong className="text-dark">{successInfo.tableName}</strong> 的訂單已成功送出。
+            </p>
+            <div className="p-3 bg-light rounded-3 mb-4 text-start" style={{ fontSize: '13px', border: '1px solid rgba(0,0,0,0.05)' }}>
+              <div className="d-flex justify-content-between mb-1">
+                <span className="text-muted">訂單編號:</span>
+                <span className="fw-mono text-dark fw-bold">{successInfo.orderNo}</span>
+              </div>
+            </div>
+            <button className="modern-btn w-100 py-2.5" onClick={handleSuccessModalConfirm}>
+              確定並返回桌台
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

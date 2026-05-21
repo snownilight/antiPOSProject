@@ -46,15 +46,22 @@
 ### 4. 前端外場點餐介面與結帳流程 (Jira: POS-22)
 - **實作內容**：新增服務生點餐介面 [OrderInterface.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/OrderInterface.jsx)，支援選桌點餐、分類篩選、商品加點、數量備註與送單。調整選單排序（桌台、點餐、商品、分類）與預設路由導向。
 - **桌台狀態連動與加點**：桌台管理頁的「開桌點餐」或「加點」會引導並鎖定桌台 ID 到點餐介面。送出訂單後發送 POST 請求至後端，桌台狀態將由後端自動連動轉為 `OCCUPIED`。
-- **多訂單合併結帳與付款**：對 `OCCUPIED` 桌台點擊「結帳」，會拉取該桌台所有的 `PENDING` 訂單，於彈窗中展示消費明細並合併計價。確認付款後併行將訂單改為 `PAID`，使桌台由後端連動轉為 `CLEANING`。
+- **多訂單合併結帳與付款**：對 `OCCUPIED` 桌台點擊「結帳」，會拉取該桌台所有的 `PENDING` 訂單，於彈窗中展示消費明細並合併計價. 確認付款後併行將訂單改為 `PAID`，使桌台由後端連動轉為 `CLEANING`。
 - **容錯與重置**：對於 `OCCUPIED` 桌台查無訂單的情境，提供「手動設為清潔中」的安全回退機制。
+- **選單失效 Bug 修復與 DOM 優化**：解決了在「點餐成功跳回桌台頁」流程下，再次切換至無參數點餐頁時，右側「選擇桌台」下拉選單失效與無法點開的 Bug。
+  - **自動清理 Modal Backdrop**：元件載入時自動清理可能因路由切換殘留的 modal 遮罩，確保事件正常穿透。
+  - **CSS 層疊層級調整**：設定 `.cart-section` 為 relative 定位並提高 z-index。
+  - **避免銷毀重構 DOM（Display 切換）**：將原先的 React 條件銷毀機制重構為使用 CSS `display: none` 隱藏，保留 `<select>` DOM 節點生命週期。
+  - **移除硬性 Disabled 與加載體驗優化**：移成了 API 未完成加載前 `<select>` 處於 `disabled` 狀態的硬性限制，改為加載中顯示 `-- 資料載入中... --` 選項，避免使用者產生「選單被卡死無法互動」的錯覺。
+  - **自訂彈窗代替 alert() 與重疊問題修復**：全面棄用阻塞式 `alert()`，替換為磨砂玻璃風格的 React 成功彈窗。同時修復了結帳成功時「結帳明細彈窗」與「成功彈窗」重疊的視覺 Bug（結帳成功時即時關閉明細彈窗，並使用 React Fragment 將成功彈窗移出相對定位容器，以避免 `z-index` 層疊堆疊限制）。
+  - **安全與除錯代碼清理**：驗證通過後，已全數移除臨時加入的偵錯紅框、網頁實時診斷面板、錯誤監聽器及相關調試日誌。
+
 
 ### 5. 專用結帳功能 (Jira: POS-23)
 - **後端專用結帳 API**：新增 `POST /api/orders/{id}/checkout` 端點。
   - **金額計算**：自動重新加總該訂單所有 `OrderItem` 的 `subtotal` 以確保金額一致。
-  - **狀態流轉**：更新訂單狀態為 `PAID`，並連動更新桌台狀態。
-  - **多訂單桌台狀態判定**：若該桌台無其他 `PENDING` 訂單，桌台將轉為 `CLEANING`（清潔中）；否則維持 `OCCUPIED`（使用中）。
-- **前端結帳介面整合**：修改 [TableList.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/TableList.jsx) 的結帳流程，移除直接對狀態欄位進行 PATCH 的作法，改為呼叫新的 POST 結帳端點，提升架構高內聚性與業務封裝性。
+  - **狀態流轉**：更新訂單狀態為 `PAID`，且結帳後桌台狀態將直接連動變更為 `CLEANING`（清潔中）。後續由服務生確認清潔完成後手動改回 `EMPTY`（空閒）。
+- **前端結帳介面整合與異常防護**：修改 [TableList.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/TableList.jsx) 的結帳流程，移除直接對狀態欄位進行 PATCH 的作法，改為呼叫新的 POST 結帳端點。另外，實作**錯誤回復與狀態自癒重整機制**，在結帳異常時自動拉取桌台最新的 `PENDING` 訂單清單，避免後續再次點擊時因重複呼叫已結帳成功的訂單而導致顯示「已結帳過」的衝突問題。
 
 ---
 

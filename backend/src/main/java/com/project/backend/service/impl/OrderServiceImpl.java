@@ -24,7 +24,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 @Service
 public class OrderServiceImpl implements OrderService {
@@ -41,7 +43,10 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
-    private static final List<String> VALID_ORDER_STATUSES = Arrays.asList("PENDING", "PAID", "CANCELLED");
+    private static final List<String> VALID_ORDER_STATUSES = Arrays.asList(
+            "PENDING", "PREPARING", "READY", "PAID", "CANCELLED");
+    private static final List<String> BILLABLE_ORDER_STATUSES = Arrays.asList("PENDING", "PREPARING", "READY");
+    private static final List<String> KITCHEN_ORDER_STATUSES = Arrays.asList("PENDING", "PREPARING");
 
     @Override
     @Transactional
@@ -140,6 +145,16 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public List<Order> getAllActiveOrders(Long tableId, List<String> statuses) {
+        return orderMapper.findAllActiveByStatuses(tableId, normalizeStatuses(statuses));
+    }
+
+    @Override
+    public List<Order> getKitchenOrders() {
+        return orderMapper.findAllActiveByStatuses(null, KITCHEN_ORDER_STATUSES);
+    }
+
+    @Override
     @Transactional
     public Order updateOrderStatus(Long id, String status) {
         Order order = getOrderById(id);
@@ -165,8 +180,8 @@ public class OrderServiceImpl implements OrderService {
             // 付款成功連動更新桌台為 CLEANING (清潔中)
             diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
         } else if ("CANCELLED".equals(upperStatus)) {
-            // 取消訂單時，如果桌台沒有其他 PENDING (活動中) 訂單，則連動更新桌台為 EMPTY (空閒)
-            List<Order> activeOrders = orderMapper.findAllActive(order.getTableId(), "PENDING");
+            // 取消訂單時，如果桌台沒有其他活動中訂單，則連動更新桌台為 EMPTY (空閒)
+            List<Order> activeOrders = orderMapper.findAllActiveByStatuses(order.getTableId(), BILLABLE_ORDER_STATUSES);
             boolean hasOtherPending = activeOrders.stream()
                     .anyMatch(o -> !o.getId().equals(order.getId()));
             if (!hasOtherPending) {
@@ -219,7 +234,7 @@ public class OrderServiceImpl implements OrderService {
     public void deleteOrder(Long id) {
         Order order = getOrderById(id);
         // 僅允許刪除已付款或已取消的訂單以防誤刪活動中的訂單
-        if ("PENDING".equals(order.getStatus())) {
+        if (BILLABLE_ORDER_STATUSES.contains(order.getStatus())) {
             throw new IllegalArgumentException("無法刪除未付款的活動中訂單，請先取消或結帳");
         }
         orderMapper.softDelete(id);
@@ -247,6 +262,26 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return prefix + "-" + dateStr + "-" + sb.toString();
+    }
+
+    private List<String> normalizeStatuses(List<String> statuses) {
+        if (statuses == null) {
+            return null;
+        }
+
+        List<String> normalized = statuses.stream()
+                .filter(status -> status != null && !status.trim().isEmpty())
+                .map(status -> status.trim().toUpperCase(Locale.ROOT))
+                .distinct()
+                .collect(Collectors.toList());
+
+        for (String status : normalized) {
+            if (!VALID_ORDER_STATUSES.contains(status)) {
+                throw new IllegalArgumentException("不合法的訂單狀態: " + status);
+            }
+        }
+
+        return normalized;
     }
 
     /**

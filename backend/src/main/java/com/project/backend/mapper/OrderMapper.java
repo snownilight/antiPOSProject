@@ -13,6 +13,8 @@ public interface OrderMapper {
     Order findByOrderNo(String orderNo);
     
     List<Order> findAllActive(@Param("tableId") Long tableId, @Param("status") String status);
+
+    List<Order> findAllActiveByStatuses(@Param("tableId") Long tableId, @Param("statuses") List<String> statuses);
     
     int insert(Order order);
     

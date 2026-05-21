@@ -5,6 +5,8 @@ import { Modal, Form, Spinner } from 'react-bootstrap';
 import API_BASE_URL from '../../utils/api';
 import useWebSocket from '../../hooks/useWebSocket';
 
+const ACTIVE_ORDER_STATUSES = 'PENDING,PREPARING,READY';
+
 const TableList = () => {
   const navigate = useNavigate();
   const [tables, setTables] = useState([]);
@@ -121,7 +123,7 @@ const TableList = () => {
     setLoadingCheckout(true);
     setCheckoutError('');
     try {
-      const res = await fetch(`${API_BASE_URL}/orders?tableId=${table.id}&status=PENDING`);
+      const res = await fetch(`${API_BASE_URL}/orders?tableId=${table.id}&statuses=${ACTIVE_ORDER_STATUSES}`);
       const json = await res.json();
       if (json.code === 200) {
         setCheckoutOrders(json.data);
@@ -170,7 +172,7 @@ const TableList = () => {
       // 結帳出錯時，重新拉取最新的未結帳訂單，避免後續再次點擊時重複結帳已付款的訂單
       if (checkoutTable) {
         try {
-          const r = await fetch(`${API_BASE_URL}/orders?tableId=${checkoutTable.id}&status=PENDING`);
+          const r = await fetch(`${API_BASE_URL}/orders?tableId=${checkoutTable.id}&statuses=${ACTIVE_ORDER_STATUSES}`);
           const json = await r.json();
           if (r.ok && json.code === 200) {
             setCheckoutOrders(json.data);
@@ -214,6 +216,15 @@ const TableList = () => {
       case 'OCCUPIED': return 'status-occupied';
       case 'CLEANING': return 'status-cleaning';
       default: return '';
+    }
+  };
+
+  const getOrderStatusLabel = (status) => {
+    switch (status) {
+      case 'PENDING': return '待製作';
+      case 'PREPARING': return '製作中';
+      case 'READY': return '已完成';
+      default: return status;
     }
   };
 
@@ -494,7 +505,7 @@ const TableList = () => {
                       <i className="bi bi-receipt me-1"></i> {order.orderNo}
                     </span>
                     <span className="badge bg-secondary">
-                      {order.status === 'PENDING' ? '未付款' : order.status}
+                      {getOrderStatusLabel(order.status)}
                     </span>
                   </div>
                   <div className="d-flex flex-column gap-2 mb-2">
@@ -518,14 +529,14 @@ const TableList = () => {
               <div className="d-flex justify-content-between align-items-center mt-3 p-3 bg-white border border-primary border-opacity-25 rounded-3">
                 <span className="fw-semibold text-secondary">所有訂單總計</span>
                 <span className="fs-3 fw-bold text-primary">
-                  ${checkoutOrders.reduce((sum, order) => sum + order.totalAmount, 0)}
+                  ${checkoutOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)}
                 </span>
               </div>
             </div>
           ) : (
             <div className="text-center py-5 text-muted">
               <i className="bi bi-info-circle" style={{ fontSize: '32px' }}></i>
-              <p className="mt-2 mb-0">此桌台目前沒有任何活動中的 PENDING 訂單。</p>
+              <p className="mt-2 mb-0">此桌台目前沒有任何活動中的未結帳訂單。</p>
               <p className="text-secondary" style={{ fontSize: '13px' }}>若您需要手動將桌台重設為清潔中，請點選下方的「手動設為清潔中」。</p>
             </div>
           )}
@@ -541,7 +552,7 @@ const TableList = () => {
               onClick={handleCheckoutConfirm}
               disabled={loadingCheckout}
             >
-              {loadingCheckout ? '處理中...' : `確認付款 ($${checkoutOrders.reduce((sum, order) => sum + order.totalAmount, 0)})`}
+              {loadingCheckout ? '處理中...' : `確認付款 ($${checkoutOrders.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0)})`}
             </button>
           ) : (
             <button 

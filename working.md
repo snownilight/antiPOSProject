@@ -89,9 +89,26 @@
 ---
 
 ## 🌿 Git 分支狀態
-- 當前分支：`POS-33` (WebSocket 即時通訊，基於 `dev` 分支建立)。
+- 當前分支：`POS-37` (廚房顯示系統 KDS，基於 `POS-33` 分支建立)。
 
 ## POS-33 Follow-up: Table Status WebSocket
 - Updated [DiningTableServiceImpl.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/service/impl/DiningTableServiceImpl.java) to publish `TABLE_STATUS_CHANGED` to `/topic/orders` whenever a table status actually changes.
 - This covers direct table status updates such as `CLEANING` -> `EMPTY` after cleaning is complete, so other connected clients refresh their table state immediately.
 - Event payload includes `event`, `tableId`, `tableName`, `status`, `previousStatus`, and `timestamp`.
+
+## 2026-05-21 POS-37 廚房顯示系統（KDS）
+- **Jira 工單**：POS-37「廚房顯示系統（KDS）」已完成實作；需求為廚房頁即時顯示 `PENDING / PREPARING` 訂單並支援狀態更新。
+- **後端狀態與 API**：
+  - 訂單狀態擴充為 `PENDING / PREPARING / READY / PAID / CANCELLED`。
+  - 新增 `GET /api/orders/kitchen`，專供 KDS 查詢 `PENDING / PREPARING` 訂單。
+  - `GET /api/orders` 新增 `statuses` 逗號分隔查詢參數，供桌台結帳取回 `PENDING / PREPARING / READY` 未結帳訂單，避免 KDS 完成後的 `READY` 訂單漏結。
+  - `PREPARING / READY` 視為活動中訂單，不允許直接刪除；取消訂單時也會檢查同桌是否仍有其他活動中訂單。
+- **前端廚房看板**：
+  - 新增 [KitchenDisplay.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/KitchenDisplay.jsx)，路由為 `/admin/kitchen`。
+  - 側邊欄新增「廚房看板」入口。
+  - KDS 頁面透過既有 WebSocket `/topic/orders` 即時刷新。
+  - 支援「開始製作」(`PENDING -> PREPARING`) 與「完成」(`PREPARING -> READY`)。
+- **驗證結果**：
+  - 後端 `mvn test` 通過，共 5 項測試通過。
+  - 前端 `npm run build` 通過。
+  - 前端 `npm run lint` 通過，僅剩既有 unused eslint-disable warning。

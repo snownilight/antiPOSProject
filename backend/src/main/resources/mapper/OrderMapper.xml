@@ -74,6 +74,29 @@
         ORDER BY o.id DESC
     </select>
 
+    <select id="findAllActiveByStatuses" resultMap="orderResultMap">
+        SELECT
+            o.id, o.table_id, o.order_no, o.total_amount, o.status, o.is_deleted, o.created_at, o.updated_at,
+            t.name AS table_name,
+            oi.id AS item_id, oi.order_id AS item_order_id, oi.product_id AS item_product_id,
+            oi.product_name AS item_product_name, oi.price AS item_price, oi.quantity AS item_quantity,
+            oi.subtotal AS item_subtotal, oi.note AS item_note, oi.created_at AS item_created_at, oi.updated_at AS item_updated_at
+        FROM orders o
+        LEFT JOIN dining_table t ON o.table_id = t.id
+        LEFT JOIN order_item oi ON o.id = oi.order_id
+        WHERE o.is_deleted = FALSE
+        <if test="tableId != null">
+            AND o.table_id = #{tableId}
+        </if>
+        <if test="statuses != null and statuses.size() > 0">
+            AND o.status IN
+            <foreach collection="statuses" item="status" open="(" separator="," close=")">
+                #{status}
+            </foreach>
+        </if>
+        ORDER BY o.id DESC
+    </select>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO orders (table_id, order_no, total_amount, status)
         VALUES (#{tableId}, #{orderNo}, #{totalAmount}, #{status})

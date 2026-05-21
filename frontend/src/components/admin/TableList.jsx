@@ -1,13 +1,22 @@
 /* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react';
-import { Modal, Form } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
+import { Modal, Form, Spinner } from 'react-bootstrap';
 import API_BASE_URL from '../../utils/api';
 
 const TableList = () => {
+  const navigate = useNavigate();
   const [tables, setTables] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingTable, setEditingTable] = useState(null);
   const [formData, setFormData] = useState({ name: '', seats: 2, status: 'EMPTY' });
+
+  // 結帳 Modal 狀態
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [checkoutTable, setCheckoutTable] = useState(null);
+  const [checkoutOrders, setCheckoutOrders] = useState([]);
+  const [loadingCheckout, setLoadingCheckout] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
 
   const fetchTables = async () => {
     try {
@@ -87,6 +96,72 @@ const TableList = () => {
       }
     } catch (error) {
       console.error('Error changing table status:', error);
+    }
+  };
+
+  const handleCloseCheckout = () => {
+    setShowCheckout(false);
+    setCheckoutTable(null);
+    setCheckoutOrders([]);
+    setCheckoutError('');
+  };
+
+  const handleShowCheckoutModal = async (table) => {
+    setCheckoutTable(table);
+    setShowCheckout(true);
+    setLoadingCheckout(true);
+    setCheckoutError('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/orders?tableId=${table.id}&status=PENDING`);
+      const json = await res.json();
+      if (json.code === 200) {
+        setCheckoutOrders(json.data);
+      } else {
+        setCheckoutError(json.message || '無法取得訂單明細');
+      }
+    } catch (e) {
+      console.error(e);
+      setCheckoutError('載入訂單失敗，請確認網路連線。');
+    } finally {
+      setLoadingCheckout(false);
+    }
+  };
+
+  const handleCheckoutConfirm = async () => {
+    if (!checkoutTable) return;
+    setLoadingCheckout(true);
+    setCheckoutError('');
+    try {
+      if (checkoutOrders.length > 0) {
+        // 將所有 PENDING 訂單更新為 PAID
+        const checkoutPromises = checkoutOrders.map(order => 
+          fetch(`${API_BASE_URL}/orders/${order.id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'PAID' })
+          }).then(async r => {
+            const json = await r.json();
+            if (!r.ok || json.code !== 200) {
+              throw new Error(json.message || `訂單 ${order.orderNo} 結帳失敗`);
+            }
+            return json.data;
+          })
+        );
+        await Promise.all(checkoutPromises);
+        alert(`桌台 ${checkoutTable.name} 結帳付款成功！`);
+      } else {
+        // 容錯：若無訂單，詢問是否直接轉為清潔中
+        if (window.confirm('此桌台無活動中訂單。是否手動將其設為清潔中？')) {
+          await handleStatusChange(checkoutTable.id, 'CLEANING');
+        }
+      }
+      fetchTables();
+      handleCloseCheckout();
+    } catch (e) {
+      console.error(e);
+      setCheckoutError(e.message || '結帳失敗，請重試。');
+    } finally {
+      setLoadingCheckout(false);
     }
   };
 
@@ -270,18 +345,28 @@ const TableList = () => {
               {table.status === 'EMPTY' && (
                 <button 
                   className="modern-btn w-100 py-2" 
-                  onClick={() => handleStatusChange(table.id, 'OCCUPIED')}
+                  onClick={() => navigate(`/admin/order?tableId=${table.id}`)}
                 >
-                  <i className="bi bi-play-fill"></i> 開始用餐
+                  <i className="bi bi-cart-plus-fill"></i> 開桌點餐
                 </button>
               )}
               {table.status === 'OCCUPIED' && (
-                <button 
-                  className="modern-btn modern-btn-danger w-100 py-2" 
-                  onClick={() => handleStatusChange(table.id, 'CLEANING')}
-                >
-                  <i className="bi bi-cash-stack"></i> 結帳與清潔
-                </button>
+                <div className="d-flex gap-2 w-100">
+                  <button 
+                    className="modern-btn modern-btn-outline flex-grow-1 py-2" 
+                    onClick={() => navigate(`/admin/order?tableId=${table.id}`)}
+                    style={{ fontSize: '14px' }}
+                  >
+                    <i className="bi bi-cart-plus"></i> 加點
+                  </button>
+                  <button 
+                    className="modern-btn modern-btn-danger flex-grow-1 py-2" 
+                    onClick={() => handleShowCheckoutModal(table)}
+                    style={{ fontSize: '14px' }}
+                  >
+                    <i className="bi bi-cash-stack"></i> 結帳
+                  </button>
+                </div>
               )}
               {table.status === 'CLEANING' && (
                 <button 
@@ -354,6 +439,100 @@ const TableList = () => {
             </button>
           </Modal.Footer>
         </Form>
+      </Modal>
+
+      {/* Checkout Modal */}
+      <Modal show={showCheckout} onHide={handleCloseCheckout} centered size="lg">
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">桌台結帳確認 - {checkoutTable?.name}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+          {checkoutError && (
+            <div className="alert alert-danger py-2 px-3 mb-3 d-flex justify-content-between align-items-center" style={{borderRadius: '10px'}}>
+              <span style={{fontSize: '14px'}}><i className="bi bi-exclamation-triangle-fill me-2"></i>{checkoutError}</span>
+              <button className="btn-close" onClick={() => setCheckoutError('')} style={{fontSize: '11px'}}></button>
+            </div>
+          )}
+
+          {loadingCheckout ? (
+            <div className="d-flex flex-column align-items-center justify-content-center py-5 gap-3">
+              <Spinner animation="border" variant="primary" />
+              <span className="text-muted">正在載入未結帳訂單...</span>
+            </div>
+          ) : checkoutOrders.length > 0 ? (
+            <div className="d-flex flex-column gap-3">
+              {checkoutOrders.map(order => (
+                <div key={order.id} className="p-3 border rounded-3 bg-light">
+                  <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                    <span className="fw-bold text-primary" style={{fontSize: '14px'}}>
+                      <i className="bi bi-receipt me-1"></i> {order.orderNo}
+                    </span>
+                    <span className="badge bg-secondary">
+                      {order.status === 'PENDING' ? '未付款' : order.status}
+                    </span>
+                  </div>
+                  <div className="d-flex flex-column gap-2 mb-2">
+                    {order.items?.map(item => (
+                      <div key={item.id} className="d-flex justify-content-between text-secondary" style={{fontSize: '14px'}}>
+                        <span>
+                          {item.productName} <span className="text-dark fw-semibold">x{item.quantity}</span>
+                          {item.note && <span className="ms-2 badge bg-light text-muted border" style={{fontSize: '10px'}}>{item.note}</span>}
+                        </span>
+                        <span>${item.subtotal}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-end fw-bold text-dark pt-1 border-top" style={{fontSize: '14px'}}>
+                    小計: ${order.totalAmount}
+                  </div>
+                </div>
+              ))}
+
+              {/* 總計結算 */}
+              <div className="d-flex justify-content-between align-items-center mt-3 p-3 bg-white border border-primary border-opacity-25 rounded-3">
+                <span className="fw-semibold text-secondary">所有訂單總計</span>
+                <span className="fs-3 fw-bold text-primary">
+                  ${checkoutOrders.reduce((sum, order) => sum + order.totalAmount, 0)}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-5 text-muted">
+              <i className="bi bi-info-circle" style={{ fontSize: '32px' }}></i>
+              <p className="mt-2 mb-0">此桌台目前沒有任何活動中的 PENDING 訂單。</p>
+              <p className="text-secondary" style={{ fontSize: '13px' }}>若您需要手動將桌台重設為清潔中，請點選下方的「手動設為清潔中」。</p>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="border-0 pt-0">
+          <button type="button" className="modern-btn modern-btn-outline" onClick={handleCloseCheckout} disabled={loadingCheckout}>
+            取消
+          </button>
+          {checkoutOrders.length > 0 ? (
+            <button 
+              type="button" 
+              className="modern-btn" 
+              onClick={handleCheckoutConfirm}
+              disabled={loadingCheckout}
+            >
+              {loadingCheckout ? '處理中...' : `確認付款 ($${checkoutOrders.reduce((sum, order) => sum + order.totalAmount, 0)})`}
+            </button>
+          ) : (
+            <button 
+              type="button" 
+              className="modern-btn modern-btn-danger" 
+              onClick={async () => {
+                if (window.confirm('確定要直接將此桌台設為清潔中嗎？')) {
+                  await handleStatusChange(checkoutTable.id, 'CLEANING');
+                  handleCloseCheckout();
+                }
+              }}
+              disabled={loadingCheckout}
+            >
+              手動設為清潔中
+            </button>
+          )}
+        </Modal.Footer>
       </Modal>
     </div>
   );

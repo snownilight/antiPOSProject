@@ -277,7 +277,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 排除 I, O, L, U 之後的字元池
         String charPool = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-        Random random = new Random();
+        java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
         StringBuilder sb = new StringBuilder(5);
         for (int i = 0; i < 5; i++) {
             sb.append(charPool.charAt(random.nextInt(charPool.length())));

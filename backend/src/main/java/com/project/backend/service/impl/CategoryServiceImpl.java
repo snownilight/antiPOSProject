@@ -23,7 +23,7 @@ public class CategoryServiceImpl implements CategoryService {
     public Category getCategoryById(Long id) {
         Category category = categoryMapper.findById(id);
         if (category == null) {
-            throw new RuntimeException("Category not found with id: " + id);
+            throw new IllegalArgumentException("找不到指定的分類 (ID: " + id + ")");
         }
         return category;
     }

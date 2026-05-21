@@ -23,7 +23,7 @@ public class ProductServiceImpl implements ProductService {
     public Product getProductById(Long id) {
         Product product = productMapper.findById(id);
         if (product == null) {
-            throw new RuntimeException("Product not found with id: " + id);
+            throw new IllegalArgumentException("找不到指定的商品 (ID: " + id + ")");
         }
         return product;
     }

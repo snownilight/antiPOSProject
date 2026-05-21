@@ -34,7 +34,7 @@ public class DiningTableServiceImpl implements DiningTableService {
     public DiningTable getTableById(Long id) {
         DiningTable table = diningTableMapper.findById(id);
         if (table == null) {
-            throw new RuntimeException("Table not found with id: " + id);
+            throw new IllegalArgumentException("找不到指定的桌台 (ID: " + id + ")");
         }
         return table;
     }
@@ -43,7 +43,7 @@ public class DiningTableServiceImpl implements DiningTableService {
     public DiningTable getTableByToken(String token) {
         DiningTable table = diningTableMapper.findByToken(token);
         if (table == null) {
-            throw new RuntimeException("Table not found with token: " + token);
+            throw new IllegalArgumentException("找不到指定的桌台 (Token: " + token + ")");
         }
         return table;
     }
@@ -68,7 +68,7 @@ public class DiningTableServiceImpl implements DiningTableService {
         DiningTable existing = getTableById(id);
         table.setId(id);
         if (table.getStatus() != null && !VALID_STATUSES.contains(table.getStatus())) {
-            throw new RuntimeException("Invalid table status: " + table.getStatus());
+            throw new IllegalArgumentException("不合法的桌台狀態: " + table.getStatus());
         }
         diningTableMapper.update(table);
         DiningTable updated = diningTableMapper.findById(id);
@@ -88,7 +88,7 @@ public class DiningTableServiceImpl implements DiningTableService {
     public DiningTable updateTableStatus(Long id, String status) {
         DiningTable existing = getTableById(id);
         if (status == null || !VALID_STATUSES.contains(status)) {
-            throw new RuntimeException("Invalid table status: " + status);
+            throw new IllegalArgumentException("不合法的桌台狀態: " + status);
         }
         if (status.equals(existing.getStatus())) {
             return existing;

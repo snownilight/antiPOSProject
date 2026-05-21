@@ -1,5 +1,4 @@
-/* eslint-disable react-hooks/exhaustive-deps, react-hooks/set-state-in-effect */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Modal, Form } from 'react-bootstrap';
 import API_BASE_URL from '../../utils/api';
 
@@ -19,15 +18,15 @@ const ProductList = () => {
     status: 'AVAILABLE'
   });
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/categories`);
       const json = await res.json();
       if (json.code === 200) setCategories(json.data);
     } catch (e) { console.error(e); }
-  };
+  }, []);
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const url = filterCategoryId 
         ? `${API_BASE_URL}/products?categoryId=${filterCategoryId}`
@@ -36,15 +35,17 @@ const ProductList = () => {
       const json = await res.json();
       if (json.code === 200) setProducts(json.data);
     } catch (e) { console.error(e); }
-  };
-
-  useEffect(() => {
-    fetchCategories();
-  }, []);
-
-  useEffect(() => {
-    fetchProducts();
   }, [filterCategoryId]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchCategories();
+  }, [fetchCategories]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchProducts();
+  }, [fetchProducts]);
 
   const handleClose = () => {
     setShowModal(false);

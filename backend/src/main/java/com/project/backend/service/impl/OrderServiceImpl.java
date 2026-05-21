@@ -12,6 +12,7 @@ import com.project.backend.service.DiningTableService;
 import com.project.backend.service.OrderService;
 import com.project.backend.service.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,20 +44,36 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
+    @Value("${order.require-staff-confirm:false}")
+    private boolean requireStaffConfirm;
+
     private static final List<String> VALID_ORDER_STATUSES = Arrays.asList(
-            "PENDING", "PREPARING", "READY", "PAID", "CANCELLED");
-    private static final List<String> BILLABLE_ORDER_STATUSES = Arrays.asList("PENDING", "PREPARING", "READY");
+            "PENDING_CONFIRM", "PENDING", "PREPARING", "READY", "PAID", "CANCELLED");
+    private static final List<String> BILLABLE_ORDER_STATUSES = Arrays.asList("PENDING_CONFIRM", "PENDING", "PREPARING", "READY");
     private static final List<String> KITCHEN_ORDER_STATUSES = Arrays.asList("PENDING", "PREPARING");
 
     @Override
     @Transactional
     public Order createOrder(OrderCreateRequest request) {
-        // 1. 驗證桌台是否存在
-        DiningTable table;
-        try {
-            table = diningTableService.getTableById(request.getTableId());
-        } catch (Exception e) {
-            throw new IllegalArgumentException("開單失敗：找不到指定的桌台 (ID: " + request.getTableId() + ")");
+        // 1. 驗證與獲取桌台
+        DiningTable table = null;
+        boolean isGuestOrder = false;
+        
+        if (request.getTableToken() != null && !request.getTableToken().trim().isEmpty()) {
+            isGuestOrder = true;
+            try {
+                table = diningTableService.getTableByToken(request.getTableToken().trim());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("開單失敗：找不到指定的桌台 (Token: " + request.getTableToken() + ")");
+            }
+        } else if (request.getTableId() != null) {
+            try {
+                table = diningTableService.getTableById(request.getTableId());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("開單失敗：找不到指定的桌台 (ID: " + request.getTableId() + ")");
+            }
+        } else {
+            throw new IllegalArgumentException("開單失敗：桌台 ID 或 Token 不能為空");
         }
 
         // 2. 計算總金額與建立訂單品項
@@ -94,12 +111,17 @@ public class OrderServiceImpl implements OrderService {
         // 3. 產生 15 碼訂單編號
         String orderNo = generateOrderNo();
 
-        // 4. 插入訂單主檔
+        // 4. 決定初始狀態與插入訂單主檔
+        String initialStatus = "PENDING";
+        if (isGuestOrder && requireStaffConfirm) {
+            initialStatus = "PENDING_CONFIRM";
+        }
+
         Order order = new Order();
-        order.setTableId(request.getTableId());
+        order.setTableId(table.getId());
         order.setOrderNo(orderNo);
         order.setTotalAmount(totalAmount);
-        order.setStatus("PENDING");
+        order.setStatus(initialStatus);
         orderMapper.insert(order);
 
         // 5. 插入訂單明細
@@ -110,7 +132,7 @@ public class OrderServiceImpl implements OrderService {
 
         // 6. 連動更新桌台狀態為 OCCUPIED (用餐中)
         if (!"OCCUPIED".equalsIgnoreCase(table.getStatus())) {
-            diningTableService.updateTableStatus(request.getTableId(), "OCCUPIED");
+            diningTableService.updateTableStatus(table.getId(), "OCCUPIED");
         }
 
         Order createdOrder = getOrderById(order.getId());

@@ -27,10 +27,10 @@ INSERT IGNORE INTO product (id, category_id, name, description, price, image_url
 VALUES (6, 3, '隱藏版特調', '已刪除的商品測試', 99.00, 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', TRUE);
 
 -- Insert default dining tables
-INSERT IGNORE INTO dining_table (id, name, seats, status) VALUES (1, 'T1', 2, 'EMPTY');
-INSERT IGNORE INTO dining_table (id, name, seats, status) VALUES (2, 'T2', 2, 'EMPTY');
-INSERT IGNORE INTO dining_table (id, name, seats, status) VALUES (3, 'T3', 4, 'OCCUPIED');
-INSERT IGNORE INTO dining_table (id, name, seats, status) VALUES (4, 'T4', 6, 'CLEANING');
+INSERT IGNORE INTO dining_table (id, name, seats, status, token) VALUES (1, 'T1', 2, 'EMPTY', 'token-t1');
+INSERT IGNORE INTO dining_table (id, name, seats, status, token) VALUES (2, 'T2', 2, 'EMPTY', 'token-t2');
+INSERT IGNORE INTO dining_table (id, name, seats, status, token) VALUES (3, 'T3', 4, 'OCCUPIED', 'token-t3');
+INSERT IGNORE INTO dining_table (id, name, seats, status, token) VALUES (4, 'T4', 6, 'CLEANING', 'token-t4');
 
 -- Insert default orders
 INSERT IGNORE INTO orders (id, table_id, order_no, total_amount, status) VALUES (1, 3, 'TW-260521-A1B2C', 100.00, 'PENDING');

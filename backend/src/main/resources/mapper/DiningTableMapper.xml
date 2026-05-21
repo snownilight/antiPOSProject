@@ -11,9 +11,13 @@
         SELECT * FROM dining_table WHERE id = #{id} AND is_deleted = FALSE
     </select>
 
+    <select id="findByToken" resultType="com.project.backend.entity.DiningTable">
+        SELECT * FROM dining_table WHERE token = #{token} AND is_deleted = FALSE
+    </select>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO dining_table (name, seats, status)
-        VALUES (#{name}, #{seats}, #{status})
+        INSERT INTO dining_table (name, seats, status, token)
+        VALUES (#{name}, #{seats}, #{status}, #{token})
     </insert>
 
     <update id="update">
@@ -22,6 +26,7 @@
             <if test="name != null">name = #{name},</if>
             <if test="seats != null">seats = #{seats},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="token != null">token = #{token},</if>
         </set>
         WHERE id = #{id} AND is_deleted = FALSE
     </update>

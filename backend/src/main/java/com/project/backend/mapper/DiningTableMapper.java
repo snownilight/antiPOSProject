@@ -8,6 +8,7 @@ import java.util.List;
 public interface DiningTableMapper {
     List<DiningTable> findAllActive();
     DiningTable findById(Long id);
+    DiningTable findByToken(String token);
     int insert(DiningTable table);
     int update(DiningTable table);
     int softDelete(Long id);

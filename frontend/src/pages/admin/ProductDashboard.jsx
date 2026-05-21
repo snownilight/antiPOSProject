@@ -30,6 +30,13 @@ const ProductDashboard = () => {
             <i className="bi bi-cart-plus"></i>
             外場點餐
           </NavLink>
+          <NavLink 
+            to="/admin/orders" 
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+          >
+            <i className="bi bi-receipt"></i>
+            訂單管理
+          </NavLink>
           <NavLink
             to="/admin/kitchen"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}

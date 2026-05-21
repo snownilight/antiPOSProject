@@ -8,8 +8,8 @@ import java.util.List;
 
 @Data
 public class OrderCreateRequest {
-    @NotNull(message = "桌台 ID 不能為空")
     private Long tableId;
+    private String tableToken;
 
     @NotEmpty(message = "訂單品項不能為空")
     @Valid

@@ -18,6 +18,7 @@ public class DiningTable {
     private Integer seats;
 
     private String status; // EMPTY, OCCUPIED, CLEANING
+    private String token;
     private Boolean isDeleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

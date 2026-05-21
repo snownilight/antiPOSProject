@@ -5,7 +5,14 @@ import com.project.backend.entity.DiningTable;
 import com.project.backend.service.DiningTableService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 
 import java.util.List;
 import java.util.Map;
@@ -13,6 +20,9 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/tables")
 public class DiningTableController {
+
+    @Value("${app.frontend.url:http://localhost:5173}")
+    private String frontendUrl;
 
     @Autowired
     private DiningTableService diningTableService;
@@ -56,4 +66,40 @@ public class DiningTableController {
             return ApiResponse.error(400, e.getMessage());
         }
     }
+
+    @GetMapping("/{id}/qrcode")
+    public ResponseEntity<byte[]> getTableQRCode(@PathVariable Long id) {
+        try {
+            DiningTable table = diningTableService.getTableById(id);
+            String token = table.getToken();
+            if (token == null || token.isEmpty()) {
+                token = java.util.UUID.randomUUID().toString();
+                table.setToken(token);
+                diningTableService.updateTable(id, table);
+            }
+            String qrCodeText = frontendUrl + "/order?token=" + token;
+            QRCodeWriter qrCodeWriter = new QRCodeWriter();
+            BitMatrix bitMatrix = qrCodeWriter.encode(qrCodeText, BarcodeFormat.QR_CODE, 300, 300);
+            
+            java.io.ByteArrayOutputStream pngOutputStream = new java.io.ByteArrayOutputStream();
+            MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream);
+            byte[] pngData = pngOutputStream.toByteArray();
+            
+            return ResponseEntity.ok()
+                    .contentType(MediaType.IMAGE_PNG)
+                    .body(pngData);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(null);
+        }
+    }
+
+    @GetMapping("/token/{token}")
+    public ApiResponse<DiningTable> getTableByToken(@PathVariable String token) {
+        try {
+            return ApiResponse.success(diningTableService.getTableByToken(token));
+        } catch (Exception e) {
+            return ApiResponse.error(404, e.getMessage());
+        }
+    }
 }
+

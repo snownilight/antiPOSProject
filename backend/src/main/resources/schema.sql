@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS dining_table (
     name VARCHAR(255) NOT NULL,
     seats INT DEFAULT 2,
     status VARCHAR(50) DEFAULT 'EMPTY', -- EMPTY, OCCUPIED, CLEANING
+    token VARCHAR(255) UNIQUE,
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -61,4 +62,8 @@ CREATE TABLE IF NOT EXISTS order_item (
     CONSTRAINT fk_item_order FOREIGN KEY (order_id) REFERENCES orders(id),
     CONSTRAINT fk_item_product FOREIGN KEY (product_id) REFERENCES product(id)
 );
+
+-- For compatibility with existing databases, dynamically add token column and populate it if needed
+ALTER TABLE dining_table ADD COLUMN IF NOT EXISTS token VARCHAR(255) UNIQUE;
+UPDATE dining_table SET token = UUID() WHERE token IS NULL;
 

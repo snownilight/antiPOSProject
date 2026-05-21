@@ -23,6 +23,10 @@ const TableList = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // QR Code Modal 狀態
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [qrcodeTable, setQrcodeTable] = useState(null);
+
   const fetchTables = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/tables`);
@@ -190,6 +194,34 @@ const TableList = () => {
     setShowSuccessModal(false);
     fetchTables();
     handleCloseCheckout();
+  };
+
+  const handleShowQRCode = (table) => {
+    setQrcodeTable(table);
+    setShowQRCode(true);
+  };
+
+  const handleCloseQRCode = () => {
+    setShowQRCode(false);
+    setQrcodeTable(null);
+  };
+
+  const handleDownloadQRCode = async () => {
+    if (!qrcodeTable) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/${qrcodeTable.id}/qrcode`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `table_${qrcodeTable.name}_qrcode.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading QR code:', error);
+    }
   };
 
   const getStatusLabel = (status) => {
@@ -360,6 +392,9 @@ const TableList = () => {
                 </div>
                 {/* Edit & Delete Action Buttons */}
                 <div className="d-flex gap-2">
+                  <button className="btn btn-link text-primary p-0" title="查看 QR Code" onClick={() => handleShowQRCode(table)}>
+                    <i className="bi bi-qr-code" style={{fontSize: '15px'}}></i>
+                  </button>
                   <button className="btn btn-link text-secondary p-0" title="編輯" onClick={() => handleShow(table)}>
                     <i className="bi bi-pencil" style={{fontSize: '15px'}}></i>
                   </button>
@@ -367,6 +402,7 @@ const TableList = () => {
                     <i className="bi bi-trash" style={{fontSize: '15px'}}></i>
                   </button>
                 </div>
+
               </div>
 
               {/* Status Badge */}
@@ -571,6 +607,38 @@ const TableList = () => {
           )}
         </Modal.Footer>
       </Modal>
+      {/* QR Code Modal */}
+      <Modal show={showQRCode} onHide={handleCloseQRCode} centered>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">{qrcodeTable?.name} 桌台 QR Code</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center py-4">
+          {qrcodeTable && (
+            <div className="d-flex flex-column align-items-center gap-3">
+              <div className="p-3 border rounded-3 bg-white shadow-sm" style={{ maxWidth: '320px' }}>
+                <img 
+                  src={`${API_BASE_URL}/tables/${qrcodeTable.id}/qrcode`} 
+                  alt={`${qrcodeTable.name} QR Code`} 
+                  className="img-fluid"
+                  style={{ width: '260px', height: '260px' }}
+                />
+              </div>
+              <p className="text-muted mb-0" style={{ fontSize: '14px' }}>
+                顧客掃描此 QR Code 即可進行手機自助點餐
+              </p>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="border-0 pt-0 justify-content-center">
+          <button type="button" className="modern-btn modern-btn-outline me-2" onClick={handleCloseQRCode}>
+            關閉
+          </button>
+          <button type="button" className="modern-btn" onClick={handleDownloadQRCode}>
+            <i className="bi bi-download me-1"></i> 下載 PNG
+          </button>
+        </Modal.Footer>
+      </Modal>
+
       </div>
       {/* Success Modal */}
       {showSuccessModal && (

@@ -40,12 +40,24 @@ public class DiningTableServiceImpl implements DiningTableService {
     }
 
     @Override
+    public DiningTable getTableByToken(String token) {
+        DiningTable table = diningTableMapper.findByToken(token);
+        if (table == null) {
+            throw new RuntimeException("Table not found with token: " + token);
+        }
+        return table;
+    }
+
+    @Override
     public DiningTable createTable(DiningTable table) {
         if (table.getSeats() == null || table.getSeats() <= 0) {
             table.setSeats(2); // default to 2 seats
         }
         if (table.getStatus() == null || !VALID_STATUSES.contains(table.getStatus())) {
             table.setStatus("EMPTY");
+        }
+        if (table.getToken() == null || table.getToken().isEmpty()) {
+            table.setToken(java.util.UUID.randomUUID().toString());
         }
         diningTableMapper.insert(table);
         return diningTableMapper.findById(table.getId());

@@ -89,7 +89,7 @@
 ---
 
 ## 🌿 Git 分支狀態
-- 當前分支：`POS-37` (廚房顯示系統 KDS，基於 `POS-33` 分支建立)。
+- 當前分支：`POS-41` (QR Code 自助點餐系統，基於 `POS-37` 分支建立)。
 
 ## POS-33 Follow-up: Table Status WebSocket
 - Updated [DiningTableServiceImpl.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/service/impl/DiningTableServiceImpl.java) to publish `TABLE_STATUS_CHANGED` to `/topic/orders` whenever a table status actually changes.
@@ -110,5 +110,19 @@
   - 支援「開始製作」(`PENDING -> PREPARING`) 與「完成」(`PREPARING -> READY`)。
 - **驗證結果**：
   - 後端 `mvn test` 通過，共 5 項測試通過。
-  - 前端 `npm run build` 通過。
+  - 前端 `npm run build` 通過.
   - 前端 `npm run lint` 通過，僅剩既有 unused eslint-disable warning。
+
+## 2026-05-21 POS-41 QR Code 自助點餐系統
+- **Jira 工單**：POS-41「QR Code 自助點餐系統」已完成實作。
+- **後端 API 與自點流程**：
+  - 新增桌台 `token` UUID 欄位，實作透過 Token 取得桌台 API 及 QR Code PNG 二進位生成端點。
+  - 支援 `order.require-staff-confirm` 設定開關，自點訂單初始狀態轉為 `PENDING_CONFIRM`，服務生審核確認後更新為 `PENDING`，外場手動點餐不受限制直接為 `PENDING`。
+  - 實作 WebSocket 事件與 `PENDING_CONFIRM` 狀態相容，支援 KDS 即時接單。
+- **前端自助點餐與審核**：
+  - 桌台管理介面支援查看與下載專屬 PNG QR Code。
+  - 新增顧客 RWD 點餐介面 [CustomerOrder.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/pages/CustomerOrder.jsx) (支援選單、客製化備註、購物車 Drawer、訂單送出與 WebSocket 即時狀態變更監聽)。
+  - 新增後台服務員 [OrderList.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/OrderList.jsx) (包含待確認、活動中、歷史訂單分頁，支援搜尋與一鍵確認、取消及結帳功能)。
+- **驗證結果**：
+  - 新增並執行 E2E 整合測試 `scratch/test_qrcode_ordering.js`，對上述完整情境進行自動化測試，100% 通過。
+  - 後端 `mvn test` 通過，前端 `npm run lint` & `npm run build` 通過。

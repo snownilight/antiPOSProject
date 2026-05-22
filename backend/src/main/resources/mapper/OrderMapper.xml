@@ -14,18 +14,21 @@
         <result property="updatedAt" column="updated_at" />
         <result property="tableName" column="table_name" />
         
-        <collection property="items" ofType="com.project.backend.entity.OrderItem" columnPrefix="item_">
-            <id property="id" column="id" />
-            <result property="orderId" column="order_id" />
-            <result property="productId" column="product_id" />
-            <result property="productName" column="product_name" />
-            <result property="price" column="price" />
-            <result property="quantity" column="quantity" />
-            <result property="subtotal" column="subtotal" />
-            <result property="note" column="note" />
-            <result property="createdAt" column="created_at" />
-            <result property="updatedAt" column="updated_at" />
-        </collection>
+        <collection property="items" ofType="com.project.backend.entity.OrderItem" resultMap="orderItemResultMap" columnPrefix="item_" />
+    </resultMap>
+
+    <resultMap id="orderItemResultMap" type="com.project.backend.entity.OrderItem">
+        <id property="id" column="id" />
+        <result property="orderId" column="order_id" />
+        <result property="productId" column="product_id" />
+        <result property="productName" column="product_name" />
+        <result property="price" column="price" />
+        <result property="quantity" column="quantity" />
+        <result property="subtotal" column="subtotal" />
+        <result property="note" column="note" />
+        <result property="createdAt" column="created_at" />
+        <result property="updatedAt" column="updated_at" />
+        <collection property="options" ofType="com.project.backend.entity.OrderItemOption" select="findOptionsByOrderItemId" column="id" />
     </resultMap>
 
     <select id="findById" resultMap="orderResultMap">
@@ -123,8 +126,22 @@
         VALUES (#{orderId}, #{productId}, #{productName}, #{price}, #{quantity}, #{subtotal}, #{note})
     </insert>
 
-    <select id="findItemsByOrderId" resultType="com.project.backend.entity.OrderItem">
+    <select id="findItemsByOrderId" resultMap="orderItemResultMap">
         SELECT * FROM order_item WHERE order_id = #{orderId} ORDER BY id ASC
+    </select>
+
+    <!-- Selected options queries and inserts -->
+    <insert id="insertOrderItemOption" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO order_item_option (order_item_id, option_id, option_name, price_modifier, parent_id)
+        VALUES (#{orderItemId}, #{optionId}, #{optionName}, #{priceModifier}, #{parentId})
+    </insert>
+
+    <select id="findOptionsByOrderItemId" resultType="com.project.backend.entity.OrderItemOption">
+        SELECT 
+            id, order_item_id AS orderItemId, option_id AS optionId, option_name AS optionName, price_modifier AS priceModifier, parent_id AS parentId, created_at AS createdAt 
+        FROM order_item_option 
+        WHERE order_item_id = #{orderItemId} 
+        ORDER BY id ASC
     </select>
 
 </mapper>

@@ -355,6 +355,11 @@ const OrderList = () => {
                     <div key={item.id || idx} className="order-item-row">
                       <div className="item-details">
                         <span className="item-name">{item.productName}</span>
+                        {item.options && item.options.length > 0 && (
+                          <div className="item-options-list">
+                            {item.options.map(opt => `${opt.optionName}${opt.priceModifier > 0 ? `(+$${opt.priceModifier})` : ''}`).join(' / ')}
+                          </div>
+                        )}
                         {item.note && <span className="item-note"><i className="bi bi-chat-right-text-fill me-1"></i>{item.note}</span>}
                       </div>
                       <div className="item-qty-price">

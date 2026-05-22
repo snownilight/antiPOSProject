@@ -221,3 +221,50 @@
   align-items: center;
   gap: 6px;
 }
+
+/* Customization Modal Styles */
+.modifier-group-section {
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 16px;
+}
+.modifier-group-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.modifier-options-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 8px;
+}
+.modifier-option-card {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: 500;
+  color: #475569;
+  user-select: none;
+}
+.modifier-option-card:hover {
+  border-color: #cbd5e1;
+}
+.modifier-option-card.selected {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: #3b82f6;
+  color: #2563eb;
+  font-weight: 600;
+}
+.modifier-option-price {
+  font-size: 11px;
+  color: #3b82f6;
+}
+.modifier-option-card.selected .modifier-option-price {
+  color: #2563eb;
+}

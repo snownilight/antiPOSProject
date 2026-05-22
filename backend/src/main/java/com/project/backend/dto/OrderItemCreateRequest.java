@@ -3,6 +3,7 @@ package com.project.backend.dto;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
+import java.util.List;
 
 @Data
 public class OrderItemCreateRequest {
@@ -14,4 +15,8 @@ public class OrderItemCreateRequest {
     private Integer quantity;
 
     private String note;
+
+    // Selected customization option IDs (POS-48)
+    private List<Long> optionIds;
 }
+

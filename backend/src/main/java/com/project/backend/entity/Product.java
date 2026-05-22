@@ -4,6 +4,7 @@ import jakarta.validation.constraints.*;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class Product {
@@ -31,4 +32,8 @@ public class Product {
     private Boolean isDeleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Customization options (POS-48)
+    private List<ModifierGroup> modifierGroups;
 }
+

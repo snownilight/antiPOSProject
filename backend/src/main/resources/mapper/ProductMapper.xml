@@ -3,7 +3,61 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.project.backend.mapper.ProductMapper">
 
-    <select id="findAllActive" resultType="com.project.backend.entity.Product">
+    <resultMap id="productResultMap" type="com.project.backend.entity.Product">
+        <id property="id" column="id" />
+        <result property="categoryId" column="category_id" />
+        <result property="name" column="name" />
+        <result property="description" column="description" />
+        <result property="price" column="price" />
+        <result property="imageUrl" column="image_url" />
+        <result property="status" column="status" />
+        <result property="isDeleted" column="is_deleted" />
+        <result property="createdAt" column="created_at" />
+        <result property="updatedAt" column="updated_at" />
+        <collection property="modifierGroups" ofType="com.project.backend.entity.ModifierGroup" select="findModifierGroupsByProductId" column="id" />
+    </resultMap>
+
+    <resultMap id="modifierGroupResultMap" type="com.project.backend.entity.ModifierGroup">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="minSelection" column="min_selection" />
+        <result property="maxSelection" column="max_selection" />
+        <result property="isDeleted" column="is_deleted" />
+        <result property="createdAt" column="created_at" />
+        <result property="updatedAt" column="updated_at" />
+        <collection property="options" ofType="com.project.backend.entity.ModifierOption" select="findOptionsByGroupId" column="id" />
+    </resultMap>
+
+    <resultMap id="modifierOptionResultMap" type="com.project.backend.entity.ModifierOption">
+        <id property="id" column="id" />
+        <result property="groupId" column="group_id" />
+        <result property="name" column="name" />
+        <result property="priceModifier" column="price_modifier" />
+        <result property="isDeleted" column="is_deleted" />
+        <result property="createdAt" column="created_at" />
+        <result property="updatedAt" column="updated_at" />
+        <collection property="modifierGroups" ofType="com.project.backend.entity.ModifierGroup" select="findModifierGroupsByOptionId" column="id" />
+    </resultMap>
+
+    <select id="findModifierGroupsByProductId" resultMap="modifierGroupResultMap">
+        SELECT mg.* FROM modifier_group mg
+        JOIN product_modifier_group pmg ON mg.id = pmg.group_id
+        WHERE pmg.product_id = #{productId} AND mg.is_deleted = FALSE
+    </select>
+
+    <select id="findOptionsByGroupId" resultMap="modifierOptionResultMap">
+        SELECT * FROM modifier_option 
+        WHERE group_id = #{groupId} AND is_deleted = FALSE
+        ORDER BY id ASC
+    </select>
+
+    <select id="findModifierGroupsByOptionId" resultMap="modifierGroupResultMap">
+        SELECT mg.* FROM modifier_group mg
+        JOIN option_modifier_group omg ON mg.id = omg.group_id
+        WHERE omg.option_id = #{optionId} AND mg.is_deleted = FALSE
+    </select>
+
+    <select id="findAllActive" resultMap="productResultMap">
         SELECT * FROM product 
         WHERE is_deleted = FALSE 
         <if test="categoryId != null">
@@ -12,7 +66,7 @@
         ORDER BY category_id ASC, id ASC
     </select>
 
-    <select id="findById" resultType="com.project.backend.entity.Product">
+    <select id="findById" resultMap="productResultMap">
         SELECT * FROM product WHERE id = #{id} AND is_deleted = FALSE
     </select>
 

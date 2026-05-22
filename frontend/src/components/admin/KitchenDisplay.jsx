@@ -3,6 +3,82 @@ import API_BASE_URL from '../../utils/api';
 import useWebSocket from '../../hooks/useWebSocket';
 import './KitchenDisplay.css';
 
+const renderKdsItemOptionsAndSubItems = (item) => {
+  if (!item.options || item.options.length === 0) return null;
+
+  // Split into parent options and child options
+  const parentOptions = item.options.filter(o => !o.parentId);
+  const childOptions = item.options.filter(o => o.parentId);
+
+  // Group child options by parentId
+  const childMap = {};
+  childOptions.forEach(child => {
+    if (!childMap[child.parentId]) {
+      childMap[child.parentId] = [];
+    }
+    childMap[child.parentId].push(child);
+  });
+
+  const subItems = [];
+  const normalBadges = [];
+
+  parentOptions.forEach(parent => {
+    const parentChildren = childMap[parent.id] || [];
+    
+    // Check if this parent option is a set meal/upgrade
+    const isSetMeal = parent.optionName.includes('套餐') || 
+                      parent.optionName.includes('升級') || 
+                      parentChildren.length > 0 ||
+                      /\(.*\+.*\)/.test(parent.optionName);
+
+    if (isSetMeal) {
+      // It is a set meal, parse its sub-items
+      // Extract contents of parentheses, e.g. "燙青菜 + 紅茶" from "升級 B 套餐 (燙青菜 + 紅茶)"
+      const match = parent.optionName.match(/\(([^)]+)\)/);
+      if (match) {
+        const content = match[1];
+        const rawItems = content.split('+').map(x => x.trim());
+        
+        // Find which item to attach the child options to
+        const isBeverageOrSoup = (name) => {
+          const keywords = ["茶", "奶", "水", "汁", "咖啡", "蜜", "汽水", "可樂", "湯", "飲"];
+          return keywords.some(kw => name.includes(kw));
+        };
+        
+        let targetIndex = rawItems.findIndex(isBeverageOrSoup);
+        if (targetIndex === -1) {
+          targetIndex = rawItems.length - 1; // Default to last item if no beverage/soup found
+        }
+        
+        rawItems.forEach((subName, idx) => {
+          if (idx === targetIndex && parentChildren.length > 0) {
+            const childrenText = parentChildren.map(c => `[${c.optionName}]`).join(' ');
+            subItems.push(`${subName} ${childrenText}`);
+          } else {
+            subItems.push(subName);
+          }
+        });
+      } else {
+        // Fallback if no parentheses, e.g. "升級 B 套餐"
+        if (parentChildren.length > 0) {
+          const childrenText = parentChildren.map(c => `[${c.optionName}]`).join(' ');
+          subItems.push(`${parent.optionName} ${childrenText}`);
+        } else {
+          subItems.push(parent.optionName);
+        }
+      }
+    } else {
+      // Normal badge
+      normalBadges.push(parent);
+    }
+  });
+
+  return {
+    subItems,
+    normalBadges
+  };
+};
+
 const KitchenDisplay = () => {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -144,6 +220,39 @@ const KitchenDisplay = () => {
                     <div key={item.id} className="kds-item">
                       <div>
                         <div className="kds-item-name">{item.productName}</div>
+                        {(() => {
+                          const parsed = renderKdsItemOptionsAndSubItems(item);
+                          if (!parsed) return null;
+                          return (
+                            <>
+                              {parsed.subItems.length > 0 && (
+                                <div className="kds-item-subitems">
+                                  {parsed.subItems.map((sub, sIdx) => (
+                                    <div key={sIdx} className="kds-subitem">
+                                      - {sub}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {parsed.normalBadges.length > 0 && (
+                                <div className="kds-item-options">
+                                  {parsed.normalBadges.map((opt, oIdx) => {
+                                    const type = opt.optionName.includes('糖') || opt.optionName.includes('冰')
+                                      ? 'ice-sweetness'
+                                      : opt.optionName.startsWith('加')
+                                        ? 'addon'
+                                        : 'default';
+                                    return (
+                                      <span key={opt.id || oIdx} className={`kds-option-badge kds-option-${type}`}>
+                                        {opt.optionName}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                         {item.note && <span className="kds-item-note">{item.note}</span>}
                       </div>
                       <span className="kds-qty">x{item.quantity}</span>

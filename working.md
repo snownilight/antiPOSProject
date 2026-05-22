@@ -59,6 +59,25 @@
 
 ## 2. 已完成的工單與變更
 
+### 📅 2026-05-22 | [Jira: POS-48] 結構化商品客製化選項與加價系統 (含套餐二次客製化)
+- **資料庫設計與初期設定**：
+  - 新增 `modifier_group` (修飾器群組)、`modifier_option` (客製化選項)、`product_modifier_group` (商品群組關聯)、`order_item_option` (訂單選項歷史) 等表。
+  - 新增 `option_modifier_group` 關聯表，以設定父客製化選項 (如套餐) 所關聯的二級客製化群組 (如甜度、冰塊)。
+  - 在 `order_item_option` 中新增 `parent_id` 欄位，用以維護子客製化選項對父客製化選項的歸屬。
+  - 於 `data.sql` 中插入套餐關聯資料，將「升級 B 套餐 (燙青菜 + 紅茶)」關聯至「甜度」與「冰塊」群組。
+- **後端架構與業務邏輯**：
+  - 實體類新增對應屬性，擴充 MyBatis ResultMap 級聯加載一級與二級客製化群組。
+  - 於 `OrderServiceImpl` 的 `createOrder` 方法中實作客製化防護驗證與動態加價計算，支援一級與二級客製化群組之 `minSelection`/`maxSelection` 遞迴驗證，並在訂單存檔時以正確的 `parentId` 層級關係存入資料庫。
+- **前端介面與客製化 Modal**：
+  - 顧客自助點餐與外場點餐介面中，針對一級客製化選項下方新增二級客製化群組的嵌套展開與收合。
+  - 實作切換或取消父選項時自動清除子選項選擇狀態的防錯邏輯，以及針對子選項的必選初始化設定。
+  - 品項加總與購物車格式化展示優化，支援遞迴計價並以 `升級 B 套餐 (燙青菜 + 紅茶)(+$60) (無糖 / 去冰)` 格式呈現。
+  - 於後台訂單管理（`OrderList`）渲染客製化細項。
+- **廚房看板 (KDS) 套餐直列顯示**：
+  - 修改 `KitchenDisplay` 的解析渲染邏輯，若品項為套餐升級，則自動解析為直列子項目（如 `- 燙青菜`、`- 紅茶 [無糖] [去冰]`），其餘一般客製化選項則維持以 Badge 形式呈現在下方，有效防範廚房漏看。
+- **自動化測試驗證**：
+  - 擴充 `scratch/test_modifiers.js` 整合測試，涵蓋商品選項查詢、防護限制、動態價格計算、錯誤傳參攔截，以及 Case 6/Case 7 (套餐二次客製化 E2E 正確創單、計價、parent_id 映射與漏選必填二次客製化之 400 阻擋防禦)，測試 100% 通過。
+
 ### 📅 2026-05-21 | [Jira: POS-47] 第一階段專案審視與優化
 - **後端優化**：
   - 刪除冗餘且具安全性疑慮的測試端點 [DebugController.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/controller/DebugController.java) 與空設定檔 `application.yml`。

@@ -1,6 +1,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Modal } from 'react-bootstrap';
 import API_BASE_URL from '../../utils/api';
 import useWebSocket from '../../hooks/useWebSocket';
 import './OrderInterface.css';
@@ -23,6 +24,11 @@ const OrderInterface = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successInfo, setSuccessInfo] = useState({ tableName: '', orderNo: '' });
+
+  // Customization State (POS-48)
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedOptions, setSelectedOptions] = useState({}); // groupId -> array of optionIds
+  const [showCustomModal, setShowCustomModal] = useState(false);
 
 
 
@@ -112,41 +118,177 @@ const OrderInterface = () => {
     return t ? t.name : '';
   };
 
-  // 購物車操作
-  const addToCart = (product) => {
-    const existingIndex = cart.findIndex(item => item.product.id === product.id);
-    if (existingIndex > -1) {
-      const newCart = [...cart];
-      newCart[existingIndex].quantity += 1;
-      setCart(newCart);
+  // 購物車操作 (POS-48)
+  const findOptionInProduct = (product, optionId) => {
+    if (!product || !product.modifierGroups) return null;
+    
+    const searchGroups = (groups) => {
+      for (const group of groups) {
+        if (!group.options) continue;
+        for (const opt of group.options) {
+          if (opt.id === optionId) {
+            return opt;
+          }
+          if (opt.modifierGroups) {
+            const found = searchGroups(opt.modifierGroups);
+            if (found) return found;
+          }
+        }
+      }
+      return null;
+    };
+    
+    return searchGroups(product.modifierGroups);
+  };
+
+  const getActiveModifierGroups = (product, selectedOptionsMap) => {
+    const activeGroups = [];
+    if (!product || !product.modifierGroups) return activeGroups;
+    
+    const collectActive = (groups) => {
+      groups.forEach(group => {
+        activeGroups.push(group);
+        const selectedIds = selectedOptionsMap[group.id] || [];
+        selectedIds.forEach(optId => {
+          const opt = group.options?.find(o => o.id === optId);
+          if (opt && opt.modifierGroups) {
+            collectActive(opt.modifierGroups);
+          }
+        });
+      });
+    };
+    
+    collectActive(product.modifierGroups);
+    return activeGroups;
+  };
+
+  const calculateOptionsPriceSum = (product, optionIds) => {
+    if (!product.modifierGroups || !optionIds || optionIds.length === 0) return 0;
+    let sum = 0;
+    
+    const scanGroups = (groups) => {
+      groups.forEach(group => {
+        if (group.options) {
+          group.options.forEach(opt => {
+            if (optionIds.includes(opt.id)) {
+              sum += opt.priceModifier;
+            }
+            if (opt.modifierGroups) {
+              scanGroups(opt.modifierGroups);
+            }
+          });
+        }
+      });
+    };
+    
+    scanGroups(product.modifierGroups);
+    return sum;
+  };
+
+  const getOptionNamesText = (product, optionIds) => {
+    if (!product.modifierGroups || !optionIds || optionIds.length === 0) return '';
+    
+    const formatOption = (opt) => {
+      let optText = opt.name;
+      if (opt.priceModifier > 0) {
+        optText += `(+$${opt.priceModifier})`;
+      }
+      
+      if (opt.modifierGroups) {
+        const subNames = [];
+        opt.modifierGroups.forEach(subGroup => {
+          if (subGroup.options) {
+            subGroup.options.forEach(subOpt => {
+              if (optionIds.includes(subOpt.id)) {
+                subNames.push(formatOption(subOpt));
+              }
+            });
+          }
+        });
+        if (subNames.length > 0) {
+          optText += ` (${subNames.join(' / ')})`;
+        }
+      }
+      return optText;
+    };
+
+    const names = [];
+    product.modifierGroups.forEach(group => {
+      if (group.options) {
+        group.options.forEach(opt => {
+          if (optionIds.includes(opt.id)) {
+            names.push(formatOption(opt));
+          }
+        });
+      }
+    });
+    
+    return names.join(' / ');
+  };
+
+  const handleProductClick = (product) => {
+    if (product.modifierGroups && product.modifierGroups.length > 0) {
+      setSelectedProduct(product);
+      const initial = {};
+      
+      const initGroup = (group) => {
+        const defaultOptions = [];
+        if (group.minSelection === 1 && group.maxSelection === 1 && group.options && group.options.length > 0) {
+          const defaultOpt = group.options[0];
+          defaultOptions.push(defaultOpt.id);
+          if (defaultOpt.modifierGroups) {
+            defaultOpt.modifierGroups.forEach(initGroup);
+          }
+        }
+        initial[group.id] = defaultOptions;
+      };
+      
+      product.modifierGroups.forEach(initGroup);
+      setSelectedOptions(initial);
+      setShowCustomModal(true);
     } else {
-      setCart([...cart, { product, quantity: 1, note: '' }]);
+      addCustomizedToCart(product, [], '');
     }
   };
 
-  const updateQuantity = (productId, delta) => {
-    const newCart = cart.map(item => {
-      if (item.product.id === productId) {
-        const nextQty = item.quantity + delta;
-        return { ...item, quantity: nextQty < 1 ? 1 : nextQty };
+  const addCustomizedToCart = (product, optionIds, note = '') => {
+    const sortedOptionIds = [...optionIds].sort((a, b) => a - b);
+    setCart(prevCart => {
+      const existingIdx = prevCart.findIndex(item => 
+        item.product.id === product.id && 
+        JSON.stringify(item.optionIds) === JSON.stringify(sortedOptionIds) &&
+        item.note === note
+      );
+      if (existingIdx > -1) {
+        const newCart = [...prevCart];
+        newCart[existingIdx].quantity += 1;
+        return newCart;
       }
-      return item;
+      const optionsPriceSum = calculateOptionsPriceSum(product, sortedOptionIds);
+      const unitPrice = product.price + optionsPriceSum;
+      return [...prevCart, { product, quantity: 1, optionIds: sortedOptionIds, note, unitPrice }];
     });
-    setCart(newCart);
   };
 
-  const updateNote = (productId, note) => {
-    const newCart = cart.map(item => {
-      if (item.product.id === productId) {
-        return { ...item, note };
-      }
-      return item;
+  const updateQuantity = (index, delta) => {
+    setCart(prevCart => {
+      const newCart = [...prevCart];
+      const nextQty = newCart[index].quantity + delta;
+      newCart[index].quantity = nextQty < 1 ? 1 : nextQty;
+      return newCart;
     });
-    setCart(newCart);
   };
 
-  const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.product.id !== productId));
+  const updateNote = (index, note) => {
+    setCart(prevCart => {
+      const newCart = [...prevCart];
+      newCart[index].note = note;
+      return newCart;
+    });
+  };
+
+  const removeFromCart = (index) => {
+    setCart(prevCart => prevCart.filter((_, idx) => idx !== index));
   };
 
   const clearCart = () => {
@@ -155,7 +297,7 @@ const OrderInterface = () => {
 
   // 計算購物車總金額
   const calculateTotal = () => {
-    return cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
+    return cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
   };
 
   // 送出訂單
@@ -177,7 +319,8 @@ const OrderInterface = () => {
       items: cart.map(item => ({
         productId: item.product.id,
         quantity: item.quantity,
-        note: item.note
+        note: item.note,
+        optionIds: item.optionIds || []
       }))
     };
 
@@ -277,7 +420,7 @@ const OrderInterface = () => {
                     </div>
                     <div className="d-flex justify-content-between align-items-center mt-2">
                       <span className="product-price">${p.price}</span>
-                      <button className="modern-btn py-1 px-3" style={{fontSize: '13px'}} onClick={() => addToCart(p)}>
+                      <button className="modern-btn py-1 px-3" style={{fontSize: '13px'}} onClick={() => handleProductClick(p)}>
                         <i className="bi bi-plus-lg"></i> 加入
                       </button>
                     </div>
@@ -327,18 +470,23 @@ const OrderInterface = () => {
 
             {/* Cart Items List */}
             <div className="cart-list">
-              {cart.map(item => (
-                <div key={item.product.id} className="cart-item">
+              {cart.map((item, idx) => (
+                <div key={idx} className="cart-item">
                   <div className="cart-item-header">
                     <span className="cart-item-title">{item.product.name}</span>
-                    <span className="cart-item-price">${item.product.price * item.quantity}</span>
+                    <span className="cart-item-price">${item.unitPrice * item.quantity}</span>
                   </div>
+                  {item.optionIds && item.optionIds.length > 0 && (
+                    <div className="text-muted mb-1" style={{ fontSize: '12px', paddingLeft: '8px' }}>
+                      {getOptionNamesText(item.product, item.optionIds)}
+                    </div>
+                  )}
                   <div className="cart-item-controls">
                     {/* Quantity Selector */}
                     <div className="d-flex align-items-center gap-2">
-                      <button className="qty-btn" onClick={() => updateQuantity(item.product.id, -1)}>-</button>
+                      <button className="qty-btn" onClick={() => updateQuantity(idx, -1)}>-</button>
                       <span className="fw-bold" style={{fontSize: '14px', minWidth: '20px', textAlign: 'center'}}>{item.quantity}</span>
-                      <button className="qty-btn" onClick={() => updateQuantity(item.product.id, 1)}>+</button>
+                      <button className="qty-btn" onClick={() => updateQuantity(idx, 1)}>+</button>
                     </div>
 
                     {/* Note Input */}
@@ -347,11 +495,11 @@ const OrderInterface = () => {
                       className="cart-item-note" 
                       placeholder="備註 (如: 少冰)"
                       value={item.note}
-                      onChange={e => updateNote(item.product.id, e.target.value)}
+                      onChange={e => updateNote(idx, e.target.value)}
                     />
 
                     {/* Remove Button */}
-                    <button className="btn btn-link text-danger p-0" title="移除" onClick={() => removeFromCart(item.product.id)}>
+                    <button className="btn btn-link text-danger p-0" title="移除" onClick={() => removeFromCart(idx)}>
                       <i className="bi bi-trash-fill" style={{fontSize: '16px'}}></i>
                     </button>
                   </div>
@@ -402,6 +550,167 @@ const OrderInterface = () => {
           </div>
         </div>
       </div>
+      {/* Customization Modal (POS-48) */}
+      <Modal show={showCustomModal} onHide={() => setShowCustomModal(false)} centered className="custom-modal">
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold text-dark" style={{ fontSize: '18px' }}>
+            {selectedProduct?.name}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="pt-2">
+          {(() => {
+            const renderModifierGroup = (group, depth = 0) => {
+              const selected = selectedOptions[group.id] || [];
+              const isInvalid = (group.minSelection && selected.length < group.minSelection) ||
+                                (group.maxSelection && group.maxSelection > 0 && selected.length > group.maxSelection);
+              
+              return (
+                <div 
+                  key={group.id} 
+                  className="modifier-group-section mb-3" 
+                  style={{ paddingLeft: `${depth * 16}px`, borderLeft: depth > 0 ? '2px dashed #dee2e6' : 'none' }}
+                >
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <h6 className="fw-bold text-dark mb-0" style={{ fontSize: depth > 0 ? '13px' : '14px' }}>
+                      {group.name}
+                      <span className="text-muted ms-1" style={{ fontSize: '11px', fontWeight: 'normal' }}>
+                        ({group.minSelection === 1 && group.maxSelection === 1 ? '必選 1' : 
+                          `選擇 ${group.minSelection || 0}~${group.maxSelection || '無限制'}`})
+                      </span>
+                    </h6>
+                    {isInvalid && (
+                      <span className="text-danger" style={{ fontSize: '11px' }}>
+                        請符合選擇限制
+                      </span>
+                    )}
+                  </div>
+                  <div className="modifier-options-grid">
+                    {group.options?.map(opt => {
+                      const isChecked = selected.includes(opt.id);
+                      const handleSelect = () => {
+                        setSelectedOptions(prev => {
+                          const currentSelected = prev[group.id] || [];
+                          let nextSelected;
+                          let deselectedOptions = [];
+                          
+                          if (group.maxSelection === 1) {
+                            deselectedOptions = currentSelected.filter(id => id !== opt.id);
+                            nextSelected = [opt.id];
+                          } else {
+                            if (currentSelected.includes(opt.id)) {
+                              deselectedOptions = [opt.id];
+                              nextSelected = currentSelected.filter(id => id !== opt.id);
+                            } else {
+                              if (group.maxSelection && group.maxSelection > 0 && currentSelected.length >= group.maxSelection) {
+                                return prev;
+                              }
+                              nextSelected = [...currentSelected, opt.id];
+                            }
+                          }
+                          
+                          const newSelectedOptions = {
+                            ...prev,
+                            [group.id]: nextSelected
+                          };
+                          
+                          const clearSubSelections = (optId) => {
+                            const optionObj = findOptionInProduct(selectedProduct, optId);
+                            if (optionObj && optionObj.modifierGroups) {
+                              optionObj.modifierGroups.forEach(subG => {
+                                delete newSelectedOptions[subG.id];
+                                if (subG.options) {
+                                  subG.options.forEach(subOpt => {
+                                    clearSubSelections(subOpt.id);
+                                  });
+                                }
+                              });
+                            }
+                          };
+                          
+                          deselectedOptions.forEach(clearSubSelections);
+                          
+                          const initSubSelections = (optId) => {
+                            const optionObj = findOptionInProduct(selectedProduct, optId);
+                            if (optionObj && optionObj.modifierGroups) {
+                              optionObj.modifierGroups.forEach(subG => {
+                                const subDefaults = [];
+                                  if (subG.minSelection === 1 && subG.maxSelection === 1 && subG.options && subG.options.length > 0) {
+                                  subDefaults.push(subG.options[0].id);
+                                }
+                                newSelectedOptions[subG.id] = subDefaults;
+                                subDefaults.forEach(initSubSelections);
+                              });
+                            }
+                          };
+                          
+                          if (group.maxSelection === 1) {
+                            initSubSelections(opt.id);
+                          } else {
+                            if (!currentSelected.includes(opt.id)) {
+                              initSubSelections(opt.id);
+                            }
+                          }
+                          
+                          return newSelectedOptions;
+                        });
+                      };
+                      
+                      return (
+                        <div key={opt.id} style={{ display: 'contents' }}>
+                          <div 
+                            className={`modifier-option-card ${isChecked ? 'selected' : ''}`}
+                            onClick={handleSelect}
+                          >
+                            <span className="modifier-option-name">{opt.name}</span>
+                            {opt.priceModifier > 0 && (
+                              <span className="modifier-option-price">+${opt.priceModifier}</span>
+                            )}
+                          </div>
+                          {isChecked && opt.modifierGroups && opt.modifierGroups.length > 0 && (
+                            <div className="modifier-nested-groups-container w-100 mt-2 mb-2" style={{ gridColumn: 'span 2' }}>
+                              {opt.modifierGroups.map(subGroup => renderModifierGroup(subGroup, depth + 1))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            };
+            return selectedProduct?.modifierGroups?.map(group => renderModifierGroup(group, 0));
+          })()}
+        </Modal.Body>
+        <Modal.Footer className="border-0 pt-0 d-flex justify-content-between align-items-center">
+          <span className="fw-bold text-primary" style={{ fontSize: '18px' }}>
+            ${selectedProduct ? selectedProduct.price + calculateOptionsPriceSum(selectedProduct, Object.values(selectedOptions).flat()) : 0}
+          </span>
+          <button 
+            className="modern-btn px-4" 
+            onClick={() => {
+              let isValid = true;
+              const activeGroups = getActiveModifierGroups(selectedProduct, selectedOptions);
+              activeGroups.forEach(group => {
+                const selected = selectedOptions[group.id] || [];
+                if (group.minSelection && selected.length < group.minSelection) isValid = false;
+                if (group.maxSelection && group.maxSelection > 0 && selected.length > group.maxSelection) isValid = false;
+              });
+              
+              if (!isValid) {
+                alert('請檢查您的客製化選項是否符合選擇數量限制！');
+                return;
+              }
+              
+              const allSelectedOptionIds = Object.values(selectedOptions).flat();
+              addCustomizedToCart(selectedProduct, allSelectedOptionIds, '');
+              setShowCustomModal(false);
+            }}
+          >
+            加入購物車
+          </button>
+        </Modal.Footer>
+      </Modal>
+
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="custom-modal-overlay">

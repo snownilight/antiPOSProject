@@ -45,3 +45,48 @@ VALUES (2, 2, 2, '香酥排骨飯', 90.00, 1, 90.00, NULL);
 INSERT IGNORE INTO order_item (id, order_id, product_id, product_name, price, quantity, subtotal, note) 
 VALUES (3, 2, 1, '招牌滷肉飯', 50.00, 1, 50.00, NULL);
 
+-- Insert Modifier Groups
+INSERT IGNORE INTO modifier_group (id, name, min_selection, max_selection) VALUES (1, '甜度', 1, 1);
+INSERT IGNORE INTO modifier_group (id, name, min_selection, max_selection) VALUES (2, '冰塊', 1, 1);
+INSERT IGNORE INTO modifier_group (id, name, min_selection, max_selection) VALUES (3, '加料', 0, 3);
+INSERT IGNORE INTO modifier_group (id, name, min_selection, max_selection) VALUES (4, '套餐升級', 0, 1);
+
+-- Insert Modifier Options
+-- 甜度 (Group 1)
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (1, 1, '正常甜', 0.00);
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (2, 1, '半糖 (5分)', 0.00);
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (3, 1, '微糖 (3分)', 0.00);
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (4, 1, '無糖', 0.00);
+
+-- 冰塊 (Group 2)
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (5, 2, '正常冰', 0.00);
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (6, 2, '少冰', 0.00);
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (7, 2, '微冰', 0.00);
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (8, 2, '去冰', 0.00);
+
+-- 加料 (Group 3)
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (9, 3, '加珍珠', 10.00);
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (10, 3, '加椰果', 10.00);
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (11, 3, '加布丁', 15.00);
+
+-- 套餐升級 (Group 4)
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (12, 4, '升級 A 套餐 (燙青菜 + 貢丸湯)', 50.00);
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (13, 4, '升級 B 套餐 (燙青菜 + 紅茶)', 60.00);
+
+-- Product Modifier Group mapping
+-- 古早味紅茶 (Product 5) -> 甜度 (Group 1), 冰塊 (Group 2), 加料 (Group 3)
+INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (5, 1);
+INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (5, 2);
+INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (5, 3);
+
+-- 招牌滷肉飯 (Product 1) -> 套餐升級 (Group 4)
+INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (1, 4);
+
+-- 香酥排骨飯 (Product 2) -> 套餐升級 (Group 4)
+INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (2, 4);
+
+-- Option Modifier Group Mapping (Option 13 "升級 B 套餐" -> Sweetness Group 1, Ice Group 2)
+INSERT IGNORE INTO option_modifier_group (option_id, group_id) VALUES (13, 1);
+INSERT IGNORE INTO option_modifier_group (option_id, group_id) VALUES (13, 2);
+
+

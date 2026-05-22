@@ -3,6 +3,7 @@ package com.project.backend.entity;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class OrderItem {
@@ -16,4 +17,8 @@ public class OrderItem {
     private String note;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    // Selected customization options (POS-48)
+    private List<OrderItemOption> options;
 }
+

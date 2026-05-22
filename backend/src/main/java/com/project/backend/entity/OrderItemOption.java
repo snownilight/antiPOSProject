@@ -12,5 +12,7 @@ public class OrderItemOption {
     private String optionName;
     private BigDecimal priceModifier;
     private Long parentId;
+    private Long bundleItemId;
+    private String bundleItemName;
     private LocalDateTime createdAt;
 }

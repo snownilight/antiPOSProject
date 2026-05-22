@@ -89,4 +89,18 @@ INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (2, 4);
 INSERT IGNORE INTO option_modifier_group (option_id, group_id) VALUES (13, 1);
 INSERT IGNORE INTO option_modifier_group (option_id, group_id) VALUES (13, 2);
 
+-- Insert Bundle Items
+-- B 套餐 (Option 13) -> 燙青菜 (ID 1), 紅茶 (ID 2)
+INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (1, 13, '燙青菜', 0);
+INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (2, 13, '紅茶', 1);
+
+-- A 套餐 (Option 12) -> 燙青菜 (ID 3), 貢丸湯 (ID 4)
+INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (3, 12, '燙青菜', 0);
+INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (4, 12, '貢丸湯', 1);
+
+-- Bundle Item Modifier Group Mapping (紅茶 (ID 2) -> 甜度 (Group 1), 冰塊 (Group 2))
+INSERT IGNORE INTO bundle_item_modifier_group (bundle_item_id, group_id) VALUES (2, 1);
+INSERT IGNORE INTO bundle_item_modifier_group (bundle_item_id, group_id) VALUES (2, 2);
+
+
 

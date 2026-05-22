@@ -15,6 +15,9 @@ public class ModifierOption {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     
-    // Nested sub-groups for this option
+    // Nested sub-groups for this option (legacy/flat support)
     private List<ModifierGroup> modifierGroups;
+
+    // Sub-items for set meals
+    private List<BundleItem> bundleItems;
 }

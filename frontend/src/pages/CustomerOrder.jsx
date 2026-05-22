@@ -144,8 +144,17 @@ const CustomerOrder = () => {
         const selectedIds = selectedOptionsMap[group.id] || [];
         selectedIds.forEach(optId => {
           const opt = group.options?.find(o => o.id === optId);
-          if (opt && opt.modifierGroups) {
-            collectActive(opt.modifierGroups);
+          if (opt) {
+            if (opt.bundleItems) {
+              opt.bundleItems.forEach(bi => {
+                if (bi.modifierGroups) {
+                  collectActive(bi.modifierGroups);
+                }
+              });
+            }
+            if (opt.modifierGroups) {
+              collectActive(opt.modifierGroups);
+            }
           }
         });
       });
@@ -165,6 +174,13 @@ const CustomerOrder = () => {
           group.options.forEach(opt => {
             if (optionIds.includes(opt.id)) {
               sum += opt.priceModifier;
+            }
+            if (opt.bundleItems) {
+              opt.bundleItems.forEach(bi => {
+                if (bi.modifierGroups) {
+                  scanGroups(bi.modifierGroups);
+                }
+              });
             }
             if (opt.modifierGroups) {
               scanGroups(opt.modifierGroups);
@@ -187,7 +203,43 @@ const CustomerOrder = () => {
         optText += `(+$${opt.priceModifier})`;
       }
       
-      if (opt.modifierGroups) {
+      // If bundleItems exist, format them dynamically (POS-48)
+      if (opt.bundleItems && opt.bundleItems.length > 0) {
+        const cleanedName = opt.name.replace(/\s*\([^)]*\)/g, '').trim();
+        let formattedName = cleanedName;
+        if (opt.priceModifier > 0) {
+          formattedName += `(+$${opt.priceModifier})`;
+        }
+        
+        const biTexts = [];
+        opt.bundleItems.forEach(bi => {
+          const selectedSubOpts = [];
+          if (bi.modifierGroups) {
+            bi.modifierGroups.forEach(subGroup => {
+              if (subGroup.options) {
+                subGroup.options.forEach(subOpt => {
+                  if (optionIds.includes(subOpt.id)) {
+                    let subOptName = subOpt.name;
+                    if (subOpt.priceModifier > 0) {
+                      subOptName += `(+$${subOpt.priceModifier})`;
+                    }
+                    selectedSubOpts.push(subOptName);
+                  }
+                });
+              }
+            });
+          }
+          if (selectedSubOpts.length > 0) {
+            biTexts.push(`${bi.name}（${selectedSubOpts.join('、')}）`);
+          } else {
+            biTexts.push(bi.name);
+          }
+        });
+        
+        return `${formattedName}：${biTexts.join(' / ')}`;
+      }
+      
+      if (opt.modifierGroups && opt.modifierGroups.length > 0) {
         const subNames = [];
         opt.modifierGroups.forEach(subGroup => {
           if (subGroup.options) {
@@ -218,6 +270,7 @@ const CustomerOrder = () => {
     
     return names.join(' / ');
   };
+
 
   const handleProductClick = (product) => {
     if (product.modifierGroups && product.modifierGroups.length > 0) {
@@ -304,6 +357,52 @@ const CustomerOrder = () => {
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   };
 
+  const buildStructuredSelectedOptions = (product, optionIds) => {
+    if (!product || !product.modifierGroups || !optionIds || optionIds.length === 0) {
+      return null;
+    }
+    
+    const selectedOptionsPayload = [];
+    
+    product.modifierGroups.forEach(group => {
+      if (group.options) {
+        group.options.forEach(opt => {
+          if (optionIds.includes(opt.id)) {
+            const selOptPayload = {
+              optionId: opt.id,
+              bundleItems: []
+            };
+            
+            if (opt.bundleItems && opt.bundleItems.length > 0) {
+              opt.bundleItems.forEach(bi => {
+                const childOptionIds = [];
+                if (bi.modifierGroups) {
+                  bi.modifierGroups.forEach(subG => {
+                    if (subG.options) {
+                      subG.options.forEach(subOpt => {
+                        if (optionIds.includes(subOpt.id)) {
+                          childOptionIds.push(subOpt.id);
+                        }
+                      });
+                    }
+                  });
+                }
+                selOptPayload.bundleItems.push({
+                  bundleItemId: bi.id,
+                  optionIds: childOptionIds
+                });
+              });
+            }
+            
+            selectedOptionsPayload.push(selOptPayload);
+          }
+        });
+      }
+    });
+    
+    return selectedOptionsPayload;
+  };
+
   const submitOrder = async () => {
     if (cart.length === 0 || !token) return;
     setSubmitting(true);
@@ -314,7 +413,8 @@ const CustomerOrder = () => {
         productId: item.product.id,
         quantity: item.quantity,
         note: item.note || null,
-        optionIds: item.optionIds || []
+        optionIds: item.optionIds || [],
+        selectedOptions: buildStructuredSelectedOptions(item.product, item.optionIds)
       }))
     };
 
@@ -669,15 +769,31 @@ const CustomerOrder = () => {
                             
                             const clearSubSelections = (optId) => {
                               const optionObj = findOptionInProduct(selectedProduct, optId);
-                              if (optionObj && optionObj.modifierGroups) {
-                                optionObj.modifierGroups.forEach(subG => {
-                                  delete newSelectedOptions[subG.id];
-                                  if (subG.options) {
-                                    subG.options.forEach(subOpt => {
-                                      clearSubSelections(subOpt.id);
-                                    });
-                                  }
-                                });
+                              if (optionObj) {
+                                if (optionObj.bundleItems) {
+                                  optionObj.bundleItems.forEach(bi => {
+                                    if (bi.modifierGroups) {
+                                      bi.modifierGroups.forEach(subG => {
+                                        delete newSelectedOptions[subG.id];
+                                        if (subG.options) {
+                                          subG.options.forEach(subOpt => {
+                                            clearSubSelections(subOpt.id);
+                                          });
+                                        }
+                                      });
+                                    }
+                                  });
+                                }
+                                if (optionObj.modifierGroups) {
+                                  optionObj.modifierGroups.forEach(subG => {
+                                    delete newSelectedOptions[subG.id];
+                                    if (subG.options) {
+                                      subG.options.forEach(subOpt => {
+                                        clearSubSelections(subOpt.id);
+                                      });
+                                    }
+                                  });
+                                }
                               }
                             };
                             
@@ -685,15 +801,31 @@ const CustomerOrder = () => {
                             
                             const initSubSelections = (optId) => {
                               const optionObj = findOptionInProduct(selectedProduct, optId);
-                              if (optionObj && optionObj.modifierGroups) {
-                                optionObj.modifierGroups.forEach(subG => {
-                                  const subDefaults = [];
-                                  if (subG.minSelection === 1 && subG.maxSelection === 1 && subG.options && subG.options.length > 0) {
-                                    subDefaults.push(subG.options[0].id);
-                                  }
-                                  newSelectedOptions[subG.id] = subDefaults;
-                                  subDefaults.forEach(initSubSelections);
-                                });
+                              if (optionObj) {
+                                if (optionObj.bundleItems) {
+                                  optionObj.bundleItems.forEach(bi => {
+                                    if (bi.modifierGroups) {
+                                      bi.modifierGroups.forEach(subG => {
+                                        const subDefaults = [];
+                                        if (subG.minSelection === 1 && subG.maxSelection === 1 && subG.options && subG.options.length > 0) {
+                                          subDefaults.push(subG.options[0].id);
+                                        }
+                                        newSelectedOptions[subG.id] = subDefaults;
+                                        subDefaults.forEach(initSubSelections);
+                                      });
+                                    }
+                                  });
+                                }
+                                if (optionObj.modifierGroups) {
+                                  optionObj.modifierGroups.forEach(subG => {
+                                    const subDefaults = [];
+                                    if (subG.minSelection === 1 && subG.maxSelection === 1 && subG.options && subG.options.length > 0) {
+                                      subDefaults.push(subG.options[0].id);
+                                    }
+                                    newSelectedOptions[subG.id] = subDefaults;
+                                    subDefaults.forEach(initSubSelections);
+                                  });
+                                }
                               }
                             };
                             
@@ -720,10 +852,33 @@ const CustomerOrder = () => {
                                 <span className="modifier-option-price">+${opt.priceModifier}</span>
                               )}
                             </div>
-                            {isChecked && opt.modifierGroups && opt.modifierGroups.length > 0 && (
-                              <div className="modifier-nested-groups-container w-100 mt-2 mb-2" style={{ gridColumn: 'span 2' }}>
-                                {opt.modifierGroups.map(subGroup => renderModifierGroup(subGroup, depth + 1))}
-                              </div>
+                            {isChecked && (
+                              <>
+                                {opt.bundleItems && opt.bundleItems.length > 0 && (
+                                  <div className="modifier-bundle-items-container w-100 mt-2 mb-2" style={{ gridColumn: 'span 2' }}>
+                                    {opt.bundleItems.map(bi => (
+                                      <div key={bi.id} className="bundle-item-section mb-3 p-3 rounded bg-light border">
+                                        <div className="bundle-item-header fw-bold text-dark border-bottom pb-1.5 mb-2 d-flex align-items-center justify-content-between" style={{ fontSize: '13px' }}>
+                                          <span><i className="bi bi-tag-fill text-secondary me-1.5"></i>{bi.name}</span>
+                                          {(!bi.modifierGroups || bi.modifierGroups.length === 0) && (
+                                            <span className="text-muted fw-normal" style={{ fontSize: '11px' }}>此品項無客製化調整</span>
+                                          )}
+                                        </div>
+                                        {bi.modifierGroups && bi.modifierGroups.length > 0 ? (
+                                          <div className="bundle-item-groups">
+                                            {bi.modifierGroups.map(subGroup => renderModifierGroup(subGroup, depth + 1))}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {(!opt.bundleItems || opt.bundleItems.length === 0) && opt.modifierGroups && opt.modifierGroups.length > 0 && (
+                                  <div className="modifier-nested-groups-container w-100 mt-2 mb-2" style={{ gridColumn: 'span 2' }}>
+                                    {opt.modifierGroups.map(subGroup => renderModifierGroup(subGroup, depth + 1))}
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         );

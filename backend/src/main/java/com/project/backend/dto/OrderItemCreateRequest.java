@@ -16,7 +16,23 @@ public class OrderItemCreateRequest {
 
     private String note;
 
-    // Selected customization option IDs (POS-48)
+    // Selected customization option IDs (POS-48) (legacy/flat support)
     private List<Long> optionIds;
+
+    // Selected customization option structures (nested set meals) (POS-48)
+    private List<SelectedOptionRequest> selectedOptions;
+
+    @Data
+    public static class SelectedOptionRequest {
+        private Long optionId;
+        private List<BundleItemSelection> bundleItems;
+    }
+
+    @Data
+    public static class BundleItemSelection {
+        private Long bundleItemId;
+        private List<Long> optionIds;
+    }
 }
+
 

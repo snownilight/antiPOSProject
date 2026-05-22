@@ -5,6 +5,91 @@ import API_BASE_URL from '../../utils/api';
 import useWebSocket from '../../hooks/useWebSocket';
 import './OrderList.css';
 
+const formatOrderOptions = (options) => {
+  if (!options || options.length === 0) return '';
+
+  const parentOptions = options.filter(o => !o.parentId);
+  const childOptions = options.filter(o => o.parentId);
+
+  const childMap = {};
+  childOptions.forEach(child => {
+    const pId = child.parentId;
+    if (!childMap[pId]) {
+      childMap[pId] = [];
+    }
+    childMap[pId].push(child);
+  });
+
+  const formattedParents = parentOptions.map(parent => {
+    const parentChildren = childMap[parent.id] || childMap[parent.optionId] || [];
+    const match = parent.optionName.match(/\(([^)]+)\)/);
+    
+    if (match) {
+      const content = match[1];
+      const rawItems = content.split('+').map(x => x.trim());
+      
+      const cleanedParentName = parent.optionName.replace(/\s*\([^)]*\)/g, '').trim();
+      let parentText = cleanedParentName;
+      if (parent.priceModifier > 0) {
+        parentText += ` (+$${parent.priceModifier})`;
+      }
+
+      const biTexts = [];
+      const isBeverageOrSoup = (name) => {
+        const keywords = ["茶", "奶", "水", "汁", "咖啡", "蜜", "汽水", "可樂", "湯", "飲"];
+        return keywords.some(kw => name.includes(kw));
+      };
+      let legacyTargetIdx = rawItems.findIndex(isBeverageOrSoup);
+      if (legacyTargetIdx === -1) {
+        legacyTargetIdx = rawItems.length - 1;
+      }
+
+      rawItems.forEach((subName, idx) => {
+        const subOpts = parentChildren.filter(c => c.bundleItemName === subName);
+        const legacyOpts = parentChildren.filter(c => !c.bundleItemName);
+        
+        const allOptsForSub = [...subOpts];
+        if (idx === legacyTargetIdx && legacyOpts.length > 0) {
+          allOptsForSub.push(...legacyOpts);
+        }
+
+        if (allOptsForSub.length > 0) {
+          const subOptNames = allOptsForSub.map(c => {
+            let name = c.optionName;
+            if (c.priceModifier > 0) {
+              name += `(+$${c.priceModifier})`;
+            }
+            return name;
+          }).join('、');
+          biTexts.push(`${subName}（${subOptNames}）`);
+        } else {
+          biTexts.push(subName);
+        }
+      });
+
+      return `${parentText}：${biTexts.join(' / ')}`;
+    }
+
+    let text = parent.optionName;
+    if (parent.priceModifier > 0) {
+      text += ` (+$${parent.priceModifier})`;
+    }
+    if (parentChildren.length > 0) {
+      const childrenText = parentChildren.map(c => {
+        let cText = c.optionName;
+        if (c.priceModifier > 0) {
+          cText += `(+$${c.priceModifier})`;
+        }
+        return cText;
+      }).join(' / ');
+      text += ` (${childrenText})`;
+    }
+    return text;
+  });
+
+  return formattedParents.join(' / ');
+};
+
 const OrderList = () => {
   const [activeTab, setActiveTab] = useState('pending_confirm');
   const [orders, setOrders] = useState([]);
@@ -357,7 +442,7 @@ const OrderList = () => {
                         <span className="item-name">{item.productName}</span>
                         {item.options && item.options.length > 0 && (
                           <div className="item-options-list">
-                            {item.options.map(opt => `${opt.optionName}${opt.priceModifier > 0 ? `(+$${opt.priceModifier})` : ''}`).join(' / ')}
+                            {formatOrderOptions(item.options)}
                           </div>
                         )}
                         {item.note && <span className="item-note"><i className="bi bi-chat-right-text-fill me-1"></i>{item.note}</span>}

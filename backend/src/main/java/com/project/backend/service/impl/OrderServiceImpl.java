@@ -98,83 +98,118 @@ public class OrderServiceImpl implements OrderService {
                 throw new IllegalArgumentException("開單失敗：商品「" + product.getName() + "」已售罄或暫不供應");
             }
 
-            // 處理客製化選項 (包含套餐二級客製化)
+            // 處理客製化選項 (包含套餐二級客製化與子餐點獨立客製化) (POS-48)
             List<OrderItemOption> selectedOptions = new ArrayList<>();
             BigDecimal priceModifierSum = BigDecimal.ZERO;
-            
-            List<Long> requestedOptionIds = itemReq.getOptionIds();
-            if (requestedOptionIds == null) {
-                requestedOptionIds = new ArrayList<>();
-            }
-            
+
             // 獲取該商品支援的所有直接客製化群組
             List<com.project.backend.entity.ModifierGroup> modifierGroups = product.getModifierGroups();
             if (modifierGroups == null) {
                 modifierGroups = new ArrayList<>();
             }
-            
-            // 用於保存已選取的一級選項，以便後續關聯子選項的 parentId
-            Map<Long, OrderItemOption> directOptionMapping = new HashMap<>();
-            
-            // 驗證選項是否屬於此商品，以及直接群組選擇數量限制
-            for (com.project.backend.entity.ModifierGroup group : modifierGroups) {
-                List<com.project.backend.entity.ModifierOption> options = group.getOptions();
-                if (options == null) {
-                    options = new ArrayList<>();
-                }
-                
-                long selectedCount = 0;
-                for (com.project.backend.entity.ModifierOption opt : options) {
-                    if (requestedOptionIds.contains(opt.getId())) {
-                        selectedCount++;
-                        priceModifierSum = priceModifierSum.add(opt.getPriceModifier());
-                        
-                        OrderItemOption itemOpt = new OrderItemOption();
-                        itemOpt.setOptionId(opt.getId());
-                        itemOpt.setOptionName(opt.getName());
-                        itemOpt.setPriceModifier(opt.getPriceModifier());
-                        itemOpt.setParentId(null); // 一級選項 parentId 為空
-                        selectedOptions.add(itemOpt);
-                        directOptionMapping.put(opt.getId(), itemOpt);
-                        
-                        // 處理並驗證該一級選項關聯的二級客製化群組
-                        List<com.project.backend.entity.ModifierGroup> subGroups = opt.getModifierGroups();
-                        if (subGroups != null && !subGroups.isEmpty()) {
-                            for (com.project.backend.entity.ModifierGroup subGroup : subGroups) {
-                                List<com.project.backend.entity.ModifierOption> subOptions = subGroup.getOptions();
-                                if (subOptions == null) {
-                                    subOptions = new ArrayList<>();
-                                }
-                                
-                                long subSelectedCount = 0;
-                                for (com.project.backend.entity.ModifierOption subOpt : subOptions) {
-                                    if (requestedOptionIds.contains(subOpt.getId())) {
-                                        subSelectedCount++;
-                                        priceModifierSum = priceModifierSum.add(subOpt.getPriceModifier());
-                                        
-                                        OrderItemOption subItemOpt = new OrderItemOption();
-                                        subItemOpt.setOptionId(subOpt.getId());
-                                        subItemOpt.setOptionName(subOpt.getName());
-                                        subItemOpt.setPriceModifier(subOpt.getPriceModifier());
-                                        // 暫時將 parentId 設為父選項的 optionId，以利存檔時對應 DB 自增 ID
-                                        subItemOpt.setParentId(opt.getId());
-                                        selectedOptions.add(subItemOpt);
-                                    }
-                                }
-                                
-                                // 驗證二級群組的數量限制
-                                if (subGroup.getMinSelection() != null && subSelectedCount < subGroup.getMinSelection()) {
-                                    throw new IllegalArgumentException("開單失敗：套餐選項「" + opt.getName() + "」的客製化群組「" + subGroup.getName() + "」最少需選擇 " + subGroup.getMinSelection() + " 項");
-                                }
-                                if (subGroup.getMaxSelection() != null && subGroup.getMaxSelection() > 0 && subSelectedCount > subGroup.getMaxSelection()) {
-                                    throw new IllegalArgumentException("開單失敗：套餐選項「" + opt.getName() + "」的客製化群組「" + subGroup.getName() + "」最多只能選擇 " + subGroup.getMaxSelection() + " 項");
-                                }
+
+            // 1. 初始化並標準化所選選項
+            Set<Long> primaryOptionIds = new java.util.HashSet<>();
+            Map<Long, Map<Long, List<Long>>> bundleSelections = new java.util.HashMap<>(); // parentOptionId -> (bundleItemId -> list of childOptionIds)
+            Map<Long, List<Long>> legacySubOptionSelections = new java.util.HashMap<>(); // parentOptionId -> list of childOptionIds
+
+            if (itemReq.getSelectedOptions() != null && !itemReq.getSelectedOptions().isEmpty()) {
+                // 新格式：結構化輸入
+                for (com.project.backend.dto.OrderItemCreateRequest.SelectedOptionRequest selOpt : itemReq.getSelectedOptions()) {
+                    primaryOptionIds.add(selOpt.getOptionId());
+                    if (selOpt.getBundleItems() != null && !selOpt.getBundleItems().isEmpty()) {
+                        Map<Long, List<Long>> biMap = new java.util.HashMap<>();
+                        for (com.project.backend.dto.OrderItemCreateRequest.BundleItemSelection biSel : selOpt.getBundleItems()) {
+                            if (biSel.getOptionIds() != null) {
+                                biMap.put(biSel.getBundleItemId(), biSel.getOptionIds());
                             }
+                        }
+                        bundleSelections.put(selOpt.getOptionId(), biMap);
+                    }
+                }
+            } else if (itemReq.getOptionIds() != null && !itemReq.getOptionIds().isEmpty()) {
+                // 舊格式：扁平輸入，自動重構樹狀結構
+                List<Long> flatIds = itemReq.getOptionIds();
+                Set<Long> productPrimaryOptionIds = new java.util.HashSet<>();
+                Map<Long, com.project.backend.entity.ModifierOption> allPrimaryOptions = new java.util.HashMap<>();
+
+                for (com.project.backend.entity.ModifierGroup group : modifierGroups) {
+                    if (group.getOptions() != null) {
+                        for (com.project.backend.entity.ModifierOption opt : group.getOptions()) {
+                            productPrimaryOptionIds.add(opt.getId());
+                            allPrimaryOptions.put(opt.getId(), opt);
                         }
                     }
                 }
-                
-                // 驗證一級群組的數量限制
+
+                for (Long id : flatIds) {
+                    if (productPrimaryOptionIds.contains(id)) {
+                        primaryOptionIds.add(id);
+                    }
+                }
+
+                List<Long> remainingIds = flatIds.stream()
+                        .filter(id -> !primaryOptionIds.contains(id))
+                        .collect(Collectors.toList());
+
+                for (Long parentOptId : primaryOptionIds) {
+                    com.project.backend.entity.ModifierOption parentOpt = allPrimaryOptions.get(parentOptId);
+                    if (parentOpt == null) continue;
+
+                    // 1. 嘗試歸入子餐點 (Bundle Items)
+                    if (parentOpt.getBundleItems() != null && !parentOpt.getBundleItems().isEmpty()) {
+                        Map<Long, List<Long>> biMap = new java.util.HashMap<>();
+                        for (com.project.backend.entity.BundleItem bi : parentOpt.getBundleItems()) {
+                            List<Long> biOptionIds = new ArrayList<>();
+                            if (bi.getModifierGroups() != null) {
+                                for (com.project.backend.entity.ModifierGroup mg : bi.getModifierGroups()) {
+                                    if (mg.getOptions() != null) {
+                                        for (com.project.backend.entity.ModifierOption mo : mg.getOptions()) {
+                                            if (remainingIds.contains(mo.getId())) {
+                                                biOptionIds.add(mo.getId());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (!biOptionIds.isEmpty()) {
+                                biMap.put(bi.getId(), biOptionIds);
+                            }
+                        }
+                        if (!biMap.isEmpty()) {
+                            bundleSelections.put(parentOptId, biMap);
+                        }
+                    }
+
+                    // 2. 嘗試歸入舊有二級客製化群組 (legacy sub-groups)
+                    if (parentOpt.getModifierGroups() != null && !parentOpt.getModifierGroups().isEmpty()) {
+                        List<Long> legacyIds = new ArrayList<>();
+                        for (com.project.backend.entity.ModifierGroup mg : parentOpt.getModifierGroups()) {
+                            if (mg.getOptions() != null) {
+                                for (com.project.backend.entity.ModifierOption mo : mg.getOptions()) {
+                                    if (remainingIds.contains(mo.getId())) {
+                                        legacyIds.add(mo.getId());
+                                    }
+                                }
+                            }
+                        }
+                        if (!legacyIds.isEmpty()) {
+                            legacySubOptionSelections.put(parentOptId, legacyIds);
+                        }
+                    }
+                }
+            }
+
+            // 2. 驗證商品的一級客製化群組選擇數量限制
+            for (com.project.backend.entity.ModifierGroup group : modifierGroups) {
+                long selectedCount = 0;
+                if (group.getOptions() != null) {
+                    for (com.project.backend.entity.ModifierOption opt : group.getOptions()) {
+                        if (primaryOptionIds.contains(opt.getId())) {
+                            selectedCount++;
+                        }
+                    }
+                }
                 if (group.getMinSelection() != null && selectedCount < group.getMinSelection()) {
                     throw new IllegalArgumentException("開單失敗：商品「" + product.getName() + "」的客製化群組「" + group.getName() + "」最少需選擇 " + group.getMinSelection() + " 項");
                 }
@@ -182,20 +217,129 @@ public class OrderServiceImpl implements OrderService {
                     throw new IllegalArgumentException("開單失敗：商品「" + product.getName() + "」的客製化群組「" + group.getName() + "」最多只能選擇 " + group.getMaxSelection() + " 項");
                 }
             }
-            
-            // 安全防護驗證：確保所有傳入的 optionId 都是商品所擁有的直接選項或已選取父選項的合法二級選項
-            Set<Long> allowedOptionIds = new HashSet<>();
-            for (com.project.backend.entity.ModifierGroup group : modifierGroups) {
-                List<com.project.backend.entity.ModifierOption> options = group.getOptions();
-                if (options != null) {
-                    for (com.project.backend.entity.ModifierOption opt : options) {
-                        allowedOptionIds.add(opt.getId());
-                        // 如果該一級選項被選取了，則其下的所有二級選項也是合法的傳參
-                        if (requestedOptionIds.contains(opt.getId()) && opt.getModifierGroups() != null) {
-                            for (com.project.backend.entity.ModifierGroup subGroup : opt.getModifierGroups()) {
+
+            // 3. 驗證套餐子餐點或舊有二級客製化群組的限制
+            for (Long parentOptId : primaryOptionIds) {
+                com.project.backend.entity.ModifierOption parentOpt = null;
+                for (com.project.backend.entity.ModifierGroup group : modifierGroups) {
+                    if (group.getOptions() != null) {
+                        for (com.project.backend.entity.ModifierOption opt : group.getOptions()) {
+                            if (opt.getId().equals(parentOptId)) {
+                                parentOpt = opt;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (parentOpt == null) {
+                    throw new IllegalArgumentException("開單失敗：找不到指定的套餐選項 ID: " + parentOptId);
+                }
+
+                // A. 驗證新版套餐子餐點 (Bundle Items)
+                if (parentOpt.getBundleItems() != null && !parentOpt.getBundleItems().isEmpty()) {
+                    Map<Long, List<Long>> biSelections = bundleSelections.getOrDefault(parentOptId, new java.util.HashMap<>());
+                    
+                    // 防禦：檢查是否傳入不屬於該套餐選項的子餐點選擇
+                    for (Long biId : biSelections.keySet()) {
+                        boolean biExists = parentOpt.getBundleItems().stream().anyMatch(bi -> bi.getId().equals(biId));
+                        if (!biExists) {
+                            throw new IllegalArgumentException("開單失敗：套餐選項「" + parentOpt.getName() + "」不包含子餐點 ID: " + biId);
+                        }
+                    }
+
+                    for (com.project.backend.entity.BundleItem bi : parentOpt.getBundleItems()) {
+                        List<Long> selectedBiOptIds = biSelections.getOrDefault(bi.getId(), new ArrayList<>());
+
+                        // 收集此子餐點所有合法選項 ID
+                        Set<Long> allowedBiOptIds = new java.util.HashSet<>();
+                        if (bi.getModifierGroups() != null) {
+                            for (com.project.backend.entity.ModifierGroup subGroup : bi.getModifierGroups()) {
                                 if (subGroup.getOptions() != null) {
                                     for (com.project.backend.entity.ModifierOption subOpt : subGroup.getOptions()) {
-                                        allowedOptionIds.add(subOpt.getId());
+                                        allowedBiOptIds.add(subOpt.getId());
+                                    }
+                                }
+                            }
+                        }
+
+                        // 防注入與歸屬驗證：拒絕不屬於該子餐點的客製化選項
+                        for (Long subOptId : selectedBiOptIds) {
+                            if (!allowedBiOptIds.contains(subOptId)) {
+                                throw new IllegalArgumentException("開單失敗：套餐子餐點「" + bi.getName() + "」不支援或不包含此客製化選項 ID: " + subOptId);
+                            }
+                        }
+
+                        // 驗證子餐點客製化群組的數量限制
+                        if (bi.getModifierGroups() != null) {
+                            for (com.project.backend.entity.ModifierGroup subGroup : bi.getModifierGroups()) {
+                                long subSelectedCount = 0;
+                                if (subGroup.getOptions() != null) {
+                                    for (com.project.backend.entity.ModifierOption subOpt : subGroup.getOptions()) {
+                                        if (selectedBiOptIds.contains(subOpt.getId())) {
+                                            subSelectedCount++;
+                                        }
+                                    }
+                                }
+                                if (subGroup.getMinSelection() != null && subSelectedCount < subGroup.getMinSelection()) {
+                                    throw new IllegalArgumentException("開單失敗：套餐子餐點「" + bi.getName() + "」的客製化群組「" + subGroup.getName() + "」最少需選擇 " + subGroup.getMinSelection() + " 項");
+                                }
+                                if (subGroup.getMaxSelection() != null && subGroup.getMaxSelection() > 0 && subSelectedCount > subGroup.getMaxSelection()) {
+                                    throw new IllegalArgumentException("開單失敗：套餐子餐點「" + bi.getName() + "」的客製化群組「" + subGroup.getName() + "」最多只能選擇 " + subGroup.getMaxSelection() + " 項");
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // B. 驗證舊有二級客製化群組 (legacy sub-groups)
+                if ((parentOpt.getBundleItems() == null || parentOpt.getBundleItems().isEmpty()) && 
+                    parentOpt.getModifierGroups() != null && !parentOpt.getModifierGroups().isEmpty()) {
+                    List<Long> legacySelectedIds = legacySubOptionSelections.getOrDefault(parentOptId, new ArrayList<>());
+                    for (com.project.backend.entity.ModifierGroup subGroup : parentOpt.getModifierGroups()) {
+                        long subSelectedCount = 0;
+                        if (subGroup.getOptions() != null) {
+                            for (com.project.backend.entity.ModifierOption subOpt : subGroup.getOptions()) {
+                                if (legacySelectedIds.contains(subOpt.getId())) {
+                                    subSelectedCount++;
+                                }
+                            }
+                        }
+                        if (subGroup.getMinSelection() != null && subSelectedCount < subGroup.getMinSelection()) {
+                            throw new IllegalArgumentException("開單失敗：套餐選項「" + parentOpt.getName() + "」的客製化群組「" + subGroup.getName() + "」最少需選擇 " + subGroup.getMinSelection() + " 項");
+                        }
+                        if (subGroup.getMaxSelection() != null && subGroup.getMaxSelection() > 0 && subSelectedCount > subGroup.getMaxSelection()) {
+                            throw new IllegalArgumentException("開單失敗：套餐選項「" + parentOpt.getName() + "」的客製化群組「" + subGroup.getName() + "」最多只能選擇 " + subGroup.getMaxSelection() + " 項");
+                        }
+                    }
+                }
+            }
+
+            // 4. 安全防護：檢查是否有非法的 optionId
+            Set<Long> allowedOptionIds = new java.util.HashSet<>();
+            for (com.project.backend.entity.ModifierGroup group : modifierGroups) {
+                if (group.getOptions() != null) {
+                    for (com.project.backend.entity.ModifierOption opt : group.getOptions()) {
+                        allowedOptionIds.add(opt.getId());
+                        if (primaryOptionIds.contains(opt.getId())) {
+                            if (opt.getBundleItems() != null) {
+                                for (com.project.backend.entity.BundleItem bi : opt.getBundleItems()) {
+                                    if (bi.getModifierGroups() != null) {
+                                        for (com.project.backend.entity.ModifierGroup subGroup : bi.getModifierGroups()) {
+                                            if (subGroup.getOptions() != null) {
+                                                for (com.project.backend.entity.ModifierOption subOpt : subGroup.getOptions()) {
+                                                    allowedOptionIds.add(subOpt.getId());
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (opt.getModifierGroups() != null) {
+                                for (com.project.backend.entity.ModifierGroup subGroup : opt.getModifierGroups()) {
+                                    if (subGroup.getOptions() != null) {
+                                        for (com.project.backend.entity.ModifierOption subOpt : subGroup.getOptions()) {
+                                            allowedOptionIds.add(subOpt.getId());
+                                        }
                                     }
                                 }
                             }
@@ -203,10 +347,99 @@ public class OrderServiceImpl implements OrderService {
                     }
                 }
             }
-            
-            for (Long reqOptionId : requestedOptionIds) {
-                if (!allowedOptionIds.contains(reqOptionId)) {
-                    throw new IllegalArgumentException("開單失敗：商品「" + product.getName() + "」不包含或不適用客製化選項 ID: " + reqOptionId);
+
+            Set<Long> rawRequestedIds = new java.util.HashSet<>();
+            if (itemReq.getOptionIds() != null) {
+                rawRequestedIds.addAll(itemReq.getOptionIds());
+            }
+            if (itemReq.getSelectedOptions() != null) {
+                for (com.project.backend.dto.OrderItemCreateRequest.SelectedOptionRequest selOpt : itemReq.getSelectedOptions()) {
+                    if (selOpt.getOptionId() != null) {
+                        rawRequestedIds.add(selOpt.getOptionId());
+                    }
+                    if (selOpt.getBundleItems() != null) {
+                        for (com.project.backend.dto.OrderItemCreateRequest.BundleItemSelection biSel : selOpt.getBundleItems()) {
+                            if (biSel.getOptionIds() != null) {
+                                rawRequestedIds.addAll(biSel.getOptionIds());
+                            }
+                        }
+                    }
+                }
+            }
+
+            for (Long reqId : rawRequestedIds) {
+                if (!allowedOptionIds.contains(reqId)) {
+                    throw new IllegalArgumentException("開單失敗：商品「" + product.getName() + "」不包含或不適用客製化選項 ID: " + reqId);
+                }
+            }
+
+
+            // 5. 實體建構與價格累加
+            for (com.project.backend.entity.ModifierGroup group : modifierGroups) {
+                if (group.getOptions() == null) continue;
+                for (com.project.backend.entity.ModifierOption opt : group.getOptions()) {
+                    if (primaryOptionIds.contains(opt.getId())) {
+                        priceModifierSum = priceModifierSum.add(opt.getPriceModifier());
+
+                        OrderItemOption itemOpt = new OrderItemOption();
+                        itemOpt.setOptionId(opt.getId());
+                        itemOpt.setOptionName(opt.getName());
+                        itemOpt.setPriceModifier(opt.getPriceModifier());
+                        itemOpt.setParentId(null);
+                        itemOpt.setBundleItemId(null);
+                        itemOpt.setBundleItemName(null);
+                        selectedOptions.add(itemOpt);
+
+                        // A. 處理套餐子餐點
+                        if (opt.getBundleItems() != null && !opt.getBundleItems().isEmpty()) {
+                            Map<Long, List<Long>> biSelections = bundleSelections.getOrDefault(opt.getId(), new java.util.HashMap<>());
+                            for (com.project.backend.entity.BundleItem bi : opt.getBundleItems()) {
+                                List<Long> selectedBiOptIds = biSelections.getOrDefault(bi.getId(), new ArrayList<>());
+                                if (bi.getModifierGroups() != null) {
+                                    for (com.project.backend.entity.ModifierGroup subGroup : bi.getModifierGroups()) {
+                                        if (subGroup.getOptions() == null) continue;
+                                        for (com.project.backend.entity.ModifierOption subOpt : subGroup.getOptions()) {
+                                            if (selectedBiOptIds.contains(subOpt.getId())) {
+                                                priceModifierSum = priceModifierSum.add(subOpt.getPriceModifier());
+
+                                                OrderItemOption subItemOpt = new OrderItemOption();
+                                                subItemOpt.setOptionId(subOpt.getId());
+                                                subItemOpt.setOptionName(subOpt.getName());
+                                                subItemOpt.setPriceModifier(subOpt.getPriceModifier());
+                                                subItemOpt.setParentId(opt.getId());
+                                                subItemOpt.setBundleItemId(bi.getId());
+                                                subItemOpt.setBundleItemName(bi.getName());
+                                                selectedOptions.add(subItemOpt);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // B. 處理舊有二級客製化群組
+                        if ((opt.getBundleItems() == null || opt.getBundleItems().isEmpty()) && 
+                            opt.getModifierGroups() != null && !opt.getModifierGroups().isEmpty()) {
+                            List<Long> legacySelectedIds = legacySubOptionSelections.getOrDefault(opt.getId(), new ArrayList<>());
+                            for (com.project.backend.entity.ModifierGroup subGroup : opt.getModifierGroups()) {
+                                if (subGroup.getOptions() == null) continue;
+                                for (com.project.backend.entity.ModifierOption subOpt : subGroup.getOptions()) {
+                                    if (legacySelectedIds.contains(subOpt.getId())) {
+                                        priceModifierSum = priceModifierSum.add(subOpt.getPriceModifier());
+
+                                        OrderItemOption subItemOpt = new OrderItemOption();
+                                        subItemOpt.setOptionId(subOpt.getId());
+                                        subItemOpt.setOptionName(subOpt.getName());
+                                        subItemOpt.setPriceModifier(subOpt.getPriceModifier());
+                                        subItemOpt.setParentId(opt.getId());
+                                        subItemOpt.setBundleItemId(null);
+                                        subItemOpt.setBundleItemName(null);
+                                        selectedOptions.add(subItemOpt);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

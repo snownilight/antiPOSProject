@@ -39,20 +39,30 @@ const renderKdsItemOptionsAndSubItems = (item) => {
         const content = match[1];
         const rawItems = content.split('+').map(x => x.trim());
         
-        // Find which item to attach the child options to
+        // Find which item to attach legacy child options to (if any)
         const isBeverageOrSoup = (name) => {
           const keywords = ["茶", "奶", "水", "汁", "咖啡", "蜜", "汽水", "可樂", "湯", "飲"];
           return keywords.some(kw => name.includes(kw));
         };
         
-        let targetIndex = rawItems.findIndex(isBeverageOrSoup);
-        if (targetIndex === -1) {
-          targetIndex = rawItems.length - 1; // Default to last item if no beverage/soup found
+        let legacyTargetIndex = rawItems.findIndex(isBeverageOrSoup);
+        if (legacyTargetIndex === -1) {
+          legacyTargetIndex = rawItems.length - 1; // Default to last item if no beverage/soup found
         }
         
         rawItems.forEach((subName, idx) => {
-          if (idx === targetIndex && parentChildren.length > 0) {
-            const childrenText = parentChildren.map(c => `[${c.optionName}]`).join(' ');
+          // Find options associated with this bundle item specifically
+          const subOpts = parentChildren.filter(c => c.bundleItemName === subName);
+          const legacyOpts = parentChildren.filter(c => !c.bundleItemName);
+          
+          const allOptsForSub = [...subOpts];
+          // If this is the target sub-item for legacy options, also attach legacy ones
+          if (idx === legacyTargetIndex && legacyOpts.length > 0) {
+            allOptsForSub.push(...legacyOpts);
+          }
+
+          if (allOptsForSub.length > 0) {
+            const childrenText = allOptsForSub.map(c => `[${c.optionName}]`).join(' ');
             subItems.push(`${subName} ${childrenText}`);
           } else {
             subItems.push(subName);

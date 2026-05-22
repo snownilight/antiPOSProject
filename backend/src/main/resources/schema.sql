@@ -108,6 +108,27 @@ CREATE TABLE IF NOT EXISTS option_modifier_group (
     CONSTRAINT fk_omg_group FOREIGN KEY (group_id) REFERENCES modifier_group(id)
 );
 
+-- Bundle Item Table
+CREATE TABLE IF NOT EXISTS bundle_item (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    option_id BIGINT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    sort_order INT DEFAULT 0,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_bi_option FOREIGN KEY (option_id) REFERENCES modifier_option(id)
+);
+
+-- Bundle Item Modifier Group (Many-to-Many Relation)
+CREATE TABLE IF NOT EXISTS bundle_item_modifier_group (
+    bundle_item_id BIGINT NOT NULL,
+    group_id BIGINT NOT NULL,
+    PRIMARY KEY (bundle_item_id, group_id),
+    CONSTRAINT fk_bimg_bundle FOREIGN KEY (bundle_item_id) REFERENCES bundle_item(id) ON DELETE CASCADE,
+    CONSTRAINT fk_bimg_group FOREIGN KEY (group_id) REFERENCES modifier_group(id)
+);
+
 -- Order Item Option Table
 CREATE TABLE IF NOT EXISTS order_item_option (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -116,6 +137,8 @@ CREATE TABLE IF NOT EXISTS order_item_option (
     option_name VARCHAR(255) NOT NULL,
     price_modifier DECIMAL(10, 2) NOT NULL,
     parent_id BIGINT NULL,
+    bundle_item_id BIGINT NULL,
+    bundle_item_name VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_oio_item FOREIGN KEY (order_item_id) REFERENCES order_item(id) ON DELETE CASCADE,
     CONSTRAINT fk_oio_option FOREIGN KEY (option_id) REFERENCES modifier_option(id),
@@ -124,5 +147,8 @@ CREATE TABLE IF NOT EXISTS order_item_option (
 
 -- Dynamically add parent_id column if it doesn't exist for existing databases
 ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS parent_id BIGINT NULL;
+ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS bundle_item_id BIGINT NULL;
+ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS bundle_item_name VARCHAR(255) NULL;
+
 
 

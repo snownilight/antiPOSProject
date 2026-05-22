@@ -11,6 +11,7 @@ public class BundleItem {
     private Long optionId;
     private String name;
     private Long targetCategoryId;
+    private Long productId;
     private BigDecimal baseAllowance;
     private Integer sortOrder;
     private Boolean isDeleted;

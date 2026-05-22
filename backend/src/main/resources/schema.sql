@@ -132,13 +132,15 @@ CREATE TABLE IF NOT EXISTS bundle_item (
     option_id BIGINT NOT NULL,
     name VARCHAR(255) NOT NULL,
     target_category_id BIGINT NULL,
+    product_id BIGINT NULL,
     base_allowance DECIMAL(10, 2) DEFAULT 0.00,
     sort_order INT DEFAULT 0,
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_bi_option FOREIGN KEY (option_id) REFERENCES modifier_option(id),
-    CONSTRAINT fk_bi_category FOREIGN KEY (target_category_id) REFERENCES category(id)
+    CONSTRAINT fk_bi_category FOREIGN KEY (target_category_id) REFERENCES category(id),
+    CONSTRAINT fk_bi_product FOREIGN KEY (product_id) REFERENCES product(id)
 );
 
 -- Bundle Item Modifier Group (Many-to-Many Relation)

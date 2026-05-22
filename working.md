@@ -73,15 +73,25 @@
 - **後端實體與 MyBatis 映射**：
   - 更新 `Product.java` 屬性並在 `ProductMapper.xml` 映射新增庫存欄位，調整 `insert` 與 `update` SQL。
 - **即時看板數據 API 與 WebSocket 廣播**：
-  - 建立 `DashboardDataDTO.java` 數據格式，並實作 `DashboardMapper.xml` 統計當日營業額、已付款訂單數、客單價、Top 5 熱銷品項與庫存警告清單。
+  - 建立 `DashboardDataDTO.java` 數據格式，並實作 `DashboardMapper.xml` 統計當日营业額、已付款訂單數、客單價、Top 5 熱銷品項與庫存警告清單。
   - 實作 `DashboardServiceImpl.java` 利用台北時間進行數據運算與 WebSocket `/topic/dashboard` 廣播。
   - 開發 `DashboardController.java` 提供 `/api/dashboard/today` 端點，並在 `SecurityConfig.java` 限制為 `ADMIN` 角色存取。
-- **庫存扣減、警報與即時看板連動**：
-  - 修改 `OrderServiceImpl.java`，在訂單變更為 `PAID` 時扣減商品庫存，檢測低庫存與售罄狀態，觸發 `STOCK_ALERT` 即時警報並發送最新看板數據。
-  - 修改 `ProductServiceImpl.java`，在管理員手動調整庫存或變更售罄狀態時，觸發即時同步。
+- **庫存扣減時機、取消回補與即時連動機制**：
+  - 修改 `OrderServiceImpl.java` 中的扣減時機：在點單或服務生審核完成（訂單轉為 `PENDING`）時即刻扣減庫存；在訂單取消（`CANCELLED`，且原狀態非 `PENDING_CONFIRM`）時自動回補庫存，並防止結帳/付款成功（`PAID`）時重複扣減。
+  - 支援套餐/自選組合（Combo Options）之庫存連動，在訂單建立與取消時遞迴更新選定商品（透過 `selected_product_id`）的庫存數量。
+  - 實作商品售罄與上架自動流轉：庫存扣減為 0 時商品狀態自動設為 `SOLD_OUT`，回補庫存使數量大於 0 時，原售罄商品自動恢復為 `AVAILABLE`（僅限自動售罄之商品）。
+  - 修改 `ProductServiceImpl.java`，在管理員手動調整庫存或變更售罄狀態時，觸發即時同步與 WebSocket 廣播。
 - **前端即時看板 UI/UX (Premium Design)**：
   - 創建 `AdminDashboard.jsx` 看板頁面，以磨砂玻璃風格 (Glassmorphism) 設計今日營業額、付款訂單數與客單價卡片，並運用原生 SVG 實現具懸浮互動的甜甜圈熱銷品項圖表。
   - 實作即時 Toast 提示與庫存警報清單連動，在 App.jsx 註冊 `/admin/dashboard` 路由並設定 `ADMIN` 自動跳轉。
+- **驗證成果**：
+  - 撰寫 `scratch/test_stock_lifecycle.js` 整合測試，完整覆蓋以下 4 大情境：
+    1. 外場店員點單（`PENDING`）之庫存即時扣減與取消回補。
+    2. 顧客自助點餐（`PENDING_CONFIRM`）無扣減、服務生審核（`PENDING`）扣減與取消回補。
+    3. 套餐內動態自選品項的庫存連動扣減與回補。
+    4. 扣至 0 件時自動轉為 `SOLD_OUT`、回補至大於 0 件時自動恢復為 `AVAILABLE`。
+  - 執行測試 100% 通過（含 `scratch/test_modifiers.js` custom modifiers 13 項驗證與 Maven 後端測試全數通過）。
+
 
 ### 📅 2026-05-22 | [Jira: POS-54] 系統權限控管與安全機制 (RBAC & JWT)
 - **後端安全基礎建設與 JWT 整合**：

@@ -322,3 +322,40 @@
     flex-grow: 1;
   }
 }
+
+/* Category Pills for Filter */
+.bg-black-alpha-05 {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.category-filter-pills {
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.category-pill-btn {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+
+.category-pill-btn:hover {
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.category-pill-btn.active {
+  color: #fff;
+  background: #6366f1; /* Indigo theme primary */
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
+}
+
+/* Specific styling for split stats annotation */
+.legend-split-info {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  display: block;
+}

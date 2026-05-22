@@ -447,6 +447,20 @@ public class OrderServiceImpl implements OrderService {
                                     selectedOptions.add(selectProdOpt);
                                 }
 
+                                // 如果是固定商品套餐子餐點，建立 OrderItemOption 以進行庫存扣減與銷售量統計
+                                if (bi.getTargetCategoryId() == null && bi.getProductId() != null) {
+                                    Product fixedProduct = productService.getProductById(bi.getProductId());
+                                    OrderItemOption fixedProdOpt = new OrderItemOption();
+                                    fixedProdOpt.setOptionId(opt.getId()); // 用套餐選項 ID 作為 optionId 以滿足外鍵約束
+                                    fixedProdOpt.setOptionName(fixedProduct.getName());
+                                    fixedProdOpt.setPriceModifier(BigDecimal.ZERO);
+                                    fixedProdOpt.setParentId(opt.getId());
+                                    fixedProdOpt.setBundleItemId(bi.getId());
+                                    fixedProdOpt.setBundleItemName(bi.getName());
+                                    fixedProdOpt.setSelectedProductId(fixedProduct.getId());
+                                    selectedOptions.add(fixedProdOpt);
+                                }
+
                                 if (bi.getModifierGroups() != null) {
                                     for (com.project.backend.entity.ModifierGroup subGroup : bi.getModifierGroups()) {
                                         if (subGroup.getOptions() == null) continue;
@@ -562,6 +576,10 @@ public class OrderServiceImpl implements OrderService {
 
         Order createdOrder = getOrderById(order.getId());
 
+        if ("PENDING".equals(initialStatus)) {
+            deductStock(createdOrder);
+        }
+
         // 7. 廣播 WebSocket 事件 (POS-33)
         broadcastOrderEvent("ORDER_CREATED", createdOrder);
 
@@ -619,6 +637,7 @@ public class OrderServiceImpl implements OrderService {
             throw new IllegalArgumentException("訂單已結帳或已取消，無法變更狀態");
         }
 
+        String oldStatus = order.getStatus();
         order.setStatus(upperStatus);
         orderMapper.update(order);
 
@@ -634,6 +653,13 @@ public class OrderServiceImpl implements OrderService {
                     .anyMatch(o -> !o.getId().equals(order.getId()));
             if (!hasOtherPending) {
                 diningTableService.updateTableStatus(order.getTableId(), "EMPTY");
+            }
+            if (!"PENDING_CONFIRM".equals(oldStatus)) {
+                replenishStock(order);
+            }
+        } else if ("PENDING".equals(upperStatus)) {
+            if ("PENDING_CONFIRM".equals(oldStatus)) {
+                deductStock(order);
             }
         }
 
@@ -679,37 +705,90 @@ public class OrderServiceImpl implements OrderService {
         return checkedOutOrder;
     }
 
-    private void processPaymentSuccess(Order order) {
+    private void changeProductStock(Long productId, int quantity, boolean isDeduct) {
+        try {
+            Product product = productService.getProductById(productId);
+            if (product != null) {
+                int currentStock = product.getStock() != null ? product.getStock() : 0;
+                int newStock;
+                if (isDeduct) {
+                    newStock = Math.max(0, currentStock - quantity);
+                    product.setStock(newStock);
+                    if (newStock == 0) {
+                        product.setStatus("SOLD_OUT");
+                    }
+                } else {
+                    newStock = currentStock + quantity;
+                    product.setStock(newStock);
+                    if ("SOLD_OUT".equalsIgnoreCase(product.getStatus()) && newStock > 0) {
+                        product.setStatus("AVAILABLE");
+                    }
+                }
+                productService.updateProduct(product.getId(), product);
+                
+                int threshold = product.getStockAlertThreshold() != null ? product.getStockAlertThreshold() : 0;
+                if (newStock <= threshold || "SOLD_OUT".equalsIgnoreCase(product.getStatus())) {
+                    dashboardService.broadcastStockAlert(product);
+                }
+            }
+        } catch (Exception e) {
+            log.error("Failed to update stock for product ID: " + productId, e);
+        }
+    }
+
+    private void deductStock(Order order) {
         try {
             List<OrderItem> items = orderMapper.findItemsByOrderId(order.getId());
             if (items != null) {
                 for (OrderItem item : items) {
-                    Product product = productService.getProductById(item.getProductId());
-                    if (product != null) {
-                        int currentStock = product.getStock() != null ? product.getStock() : 0;
-                        int quantity = item.getQuantity();
-                        int newStock = Math.max(0, currentStock - quantity);
-                        product.setStock(newStock);
-                        
-                        // If stock drops to 0, mark as SOLD_OUT
-                        if (newStock == 0) {
-                            product.setStatus("SOLD_OUT");
-                        }
-                        
-                        productService.updateProduct(product.getId(), product);
-                        
-                        // Check alert threshold
-                        int threshold = product.getStockAlertThreshold() != null ? product.getStockAlertThreshold() : 0;
-                        if (newStock <= threshold || "SOLD_OUT".equalsIgnoreCase(product.getStatus())) {
-                            dashboardService.broadcastStockAlert(product);
+                    // 1. Deduct primary product stock
+                    changeProductStock(item.getProductId(), item.getQuantity(), true);
+                    
+                    // 2. Deduct selected products in combo options
+                    if (item.getOptions() != null) {
+                        for (OrderItemOption opt : item.getOptions()) {
+                            if (opt.getSelectedProductId() != null) {
+                                changeProductStock(opt.getSelectedProductId(), item.getQuantity(), true);
+                            }
                         }
                     }
                 }
             }
-            // Broadcast dashboard updates
             dashboardService.broadcastDashboardUpdate();
         } catch (Exception e) {
-            // Log exceptions but do not crash the order transaction
+            log.error("Failed to deduct stock for order ID: " + order.getId(), e);
+        }
+    }
+
+    private void replenishStock(Order order) {
+        try {
+            List<OrderItem> items = orderMapper.findItemsByOrderId(order.getId());
+            if (items != null) {
+                for (OrderItem item : items) {
+                    // 1. Replenish primary product stock
+                    changeProductStock(item.getProductId(), item.getQuantity(), false);
+                    
+                    // 2. Replenish selected products in combo options
+                    if (item.getOptions() != null) {
+                        for (OrderItemOption opt : item.getOptions()) {
+                            if (opt.getSelectedProductId() != null) {
+                                changeProductStock(opt.getSelectedProductId(), item.getQuantity(), false);
+                            }
+                        }
+                    }
+                }
+            }
+            dashboardService.broadcastDashboardUpdate();
+        } catch (Exception e) {
+            log.error("Failed to replenish stock for order ID: " + order.getId(), e);
+        }
+    }
+
+    private void processPaymentSuccess(Order order) {
+        try {
+            // Broadcast dashboard updates for revenue and order count
+            dashboardService.broadcastDashboardUpdate();
+        } catch (Exception e) {
             log.error("Failed to process payment success side effects: ", e);
         }
     }

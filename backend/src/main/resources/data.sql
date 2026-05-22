@@ -35,6 +35,9 @@ VALUES (11, 2, '皮蛋豆腐', '經典爽口涼拌菜', 35.00, 'https://images.u
 INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, stock, stock_alert_threshold) 
 VALUES (9, 3, '珍珠奶茶', '濃郁奶香與Q彈珍珠的完美結合', 50.00, 'https://images.unsplash.com/photo-1576092762791-dd9e2220abd4?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', 15, 3);
 
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, stock, stock_alert_threshold) 
+VALUES (12, 2, '貢丸湯', '鮮美湯頭與彈牙貢丸', 35.00, 'https://images.unsplash.com/photo-1547592180-85f173990554?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', 15, 3);
+
 -- Insert default dining tables
 INSERT IGNORE INTO dining_table (id, name, seats, status, token) VALUES (1, 'T1', 2, 'EMPTY', 'token-t1');
 INSERT IGNORE INTO dining_table (id, name, seats, status, token) VALUES (2, 'T2', 2, 'EMPTY', 'token-t2');
@@ -110,12 +113,12 @@ INSERT IGNORE INTO option_modifier_group (option_id, group_id) VALUES (14, 2);
 
 -- Insert Bundle Items
 -- B 套餐 (Option 13) -> 燙青菜 (ID 1), 紅茶 (ID 2)
-INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (1, 13, '燙青菜', 0);
-INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (2, 13, '紅茶', 1);
+INSERT IGNORE INTO bundle_item (id, option_id, name, product_id, sort_order) VALUES (1, 13, '燙青菜', 3, 0);
+INSERT IGNORE INTO bundle_item (id, option_id, name, product_id, sort_order) VALUES (2, 13, '紅茶', 5, 1);
 
 -- A 套餐 (Option 12) -> 燙青菜 (ID 3), 貢丸湯 (ID 4)
-INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (3, 12, '燙青菜', 0);
-INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (4, 12, '貢丸湯', 1);
+INSERT IGNORE INTO bundle_item (id, option_id, name, product_id, sort_order) VALUES (3, 12, '燙青菜', 3, 0);
+INSERT IGNORE INTO bundle_item (id, option_id, name, product_id, sort_order) VALUES (4, 12, '貢丸湯', 12, 1);
 
 -- C 套餐 (Option 14) -> 自選小菜 (ID 5, Category 2, Allowance $20), 自選飲料 (ID 6, Category 3, Allowance $30)
 INSERT IGNORE INTO bundle_item (id, option_id, name, target_category_id, base_allowance, sort_order) VALUES (5, 14, '自選小菜', 2, 20.00, 0);

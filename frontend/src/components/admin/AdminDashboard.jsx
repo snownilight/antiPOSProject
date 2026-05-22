@@ -24,6 +24,7 @@ const AdminDashboard = () => {
   const [toasts, setToasts] = useState([]);
   const [hoveredSlice, setHoveredSlice] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedCategoryId, setSelectedCategoryId] = useState('ALL');
 
   // Fetch initial dashboard data
   const fetchDashboardData = useCallback(async () => {
@@ -86,12 +87,30 @@ const AdminDashboard = () => {
   const strokeWidth = 10;
   const circumference = 2 * Math.PI * radius; // ~219.91
   
-  const topProducts = dashboardData.topProducts || [];
-  const totalSales = topProducts.reduce((sum, p) => sum + p.quantitySold, 0);
+  // Get unique categories dynamically from top products
+  const uniqueCategories = [
+    { id: 'ALL', name: '全部' },
+    ...Array.from(
+      new Map(
+        (dashboardData.topProducts || [])
+          .filter(p => p.categoryId && p.categoryName)
+          .map(p => [p.categoryId, { id: p.categoryId, name: p.categoryName }])
+      ).values()
+    )
+  ];
+
+  // Filter products by selected category
+  const filteredProducts = selectedCategoryId === 'ALL'
+    ? (dashboardData.topProducts || [])
+    : (dashboardData.topProducts || []).filter(p => p.categoryId === selectedCategoryId);
+
+  // Take Top 5 for display
+  const topFilteredProducts = filteredProducts.slice(0, 5);
+  const totalSales = topFilteredProducts.reduce((sum, p) => sum + p.quantitySold, 0);
 
   // Compute SVG slices
   let accumulatedLength = 0;
-  const slices = topProducts.map((p, index) => {
+  const slices = topFilteredProducts.map((p, index) => {
     const percentage = totalSales > 0 ? p.quantitySold / totalSales : 0;
     const strokeLength = percentage * circumference;
     const strokeOffset = -accumulatedLength;
@@ -182,16 +201,34 @@ const AdminDashboard = () => {
           <div className="row g-4">
             {/* Sales Chart Section */}
             <div className="col-lg-5">
-              <div className="glass-panel h-100">
-                <h4 className="panel-title mb-4">Top 5 熱銷品項</h4>
+              <div className="glass-panel h-100 d-flex flex-column">
+                <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                  <h4 className="panel-title mb-0">Top 5 熱銷品項</h4>
+                  {uniqueCategories.length > 1 && (
+                    <div className="category-filter-pills d-flex gap-1 bg-black-alpha-05 p-1 rounded-pill">
+                      {uniqueCategories.map(cat => (
+                        <button
+                          key={cat.id}
+                          onClick={() => {
+                            setSelectedCategoryId(cat.id);
+                            setHoveredSlice(null);
+                          }}
+                          className={`category-pill-btn rounded-pill border-0 px-3 py-1 ${selectedCategoryId === cat.id ? 'active' : ''}`}
+                        >
+                          {cat.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 
-                {topProducts.length === 0 ? (
-                  <div className="d-flex flex-column align-items-center justify-content-center h-75 py-5 text-muted">
+                {topFilteredProducts.length === 0 ? (
+                  <div className="d-flex flex-column align-items-center justify-content-center flex-grow-1 py-5 text-muted">
                     <i className="bi bi-pie-chart mb-3" style={{ fontSize: '3rem', opacity: 0.3 }}></i>
-                    <span>今日尚無銷售數據</span>
+                    <span>該分類今日尚無銷售數據</span>
                   </div>
                 ) : (
-                  <div className="chart-layout">
+                  <div className="chart-layout flex-grow-1">
                     {/* SVG Donut */}
                     <div className="donut-chart-container">
                       <svg viewBox="0 0 100 100" width="100%" height="100%">
@@ -235,11 +272,11 @@ const AdminDashboard = () => {
                             <span className="donut-center-title text-truncate" style={{ maxWidth: '90px' }}>
                               {slices[hoveredSlice].productName}
                             </span>
-                            <span className="donut-center-value">
-                              {slices[hoveredSlice].quantitySold} 份
+                            <span className="donut-center-value" style={{ fontSize: '16px' }}>
+                              {slices[hoveredSlice].quantitySold} 份 ({(slices[hoveredSlice].percentage * 100).toFixed(0)}%)
                             </span>
-                            <span className="donut-center-subtitle">
-                              ({(slices[hoveredSlice].percentage * 100).toFixed(0)}%)
+                            <span className="donut-center-subtitle text-muted mt-1" style={{ fontSize: '10px' }}>
+                              單 {slices[hoveredSlice].singleSold || 0} / 套 {slices[hoveredSlice].comboSold || 0}
                             </span>
                           </>
                         ) : (
@@ -263,7 +300,12 @@ const AdminDashboard = () => {
                         >
                           <div className="d-flex align-items-center gap-2 text-truncate">
                             <span className="legend-badge" style={{ backgroundColor: slice.color }}></span>
-                            <span className="legend-name text-truncate">{slice.productName}</span>
+                            <div className="d-flex flex-column text-truncate">
+                              <span className="legend-name text-truncate fw-semibold">{slice.productName}</span>
+                              <span className="legend-split-info text-muted">
+                                (單點 {slice.singleSold || 0} / 套餐 {slice.comboSold || 0})
+                              </span>
+                            </div>
                           </div>
                           <div className="d-flex align-items-center gap-3">
                             <span className="legend-value fw-semibold">{slice.quantitySold} 份</span>

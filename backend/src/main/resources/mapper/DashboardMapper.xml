@@ -19,16 +19,36 @@
 
     <select id="getTodayTopProducts" resultType="com.project.backend.dto.DashboardDataDTO$ProductSalesDTO">
         SELECT 
-            oi.product_id AS productId, 
-            MAX(oi.product_name) AS productName, 
-            CAST(SUM(oi.quantity) AS SIGNED) AS quantitySold
-        FROM order_item oi
-        JOIN orders o ON oi.order_id = o.id
-        WHERE o.status = 'PAID' AND o.is_deleted = FALSE
-          AND o.created_at &gt;= #{startTime} AND o.created_at &lt;= #{endTime}
-        GROUP BY oi.product_id
+            p.id AS productId,
+            p.name AS productName,
+            p.category_id AS categoryId,
+            c.name AS categoryName,
+            CAST(COALESCE(single_sales.sold_qty, 0) AS SIGNED) AS singleSold,
+            CAST(COALESCE(combo_sales.sold_qty, 0) AS SIGNED) AS comboSold,
+            CAST((COALESCE(single_sales.sold_qty, 0) + COALESCE(combo_sales.sold_qty, 0)) AS SIGNED) AS quantitySold
+        FROM product p
+        JOIN category c ON p.category_id = c.id
+        LEFT JOIN (
+            SELECT oi.product_id, SUM(oi.quantity) AS sold_qty
+            FROM order_item oi
+            JOIN orders o ON oi.order_id = o.id
+            WHERE o.status = 'PAID' AND o.is_deleted = FALSE
+              AND o.created_at &gt;= #{startTime} AND o.created_at &lt;= #{endTime}
+            GROUP BY oi.product_id
+        ) single_sales ON p.id = single_sales.product_id
+        LEFT JOIN (
+            SELECT oio.selected_product_id, SUM(oi.quantity) AS sold_qty
+            FROM order_item_option oio
+            JOIN order_item oi ON oio.order_item_id = oi.id
+            JOIN orders o ON oi.order_id = o.id
+            WHERE o.status = 'PAID' AND o.is_deleted = FALSE
+              AND o.created_at &gt;= #{startTime} AND o.created_at &lt;= #{endTime}
+              AND oio.selected_product_id IS NOT NULL
+            GROUP BY oio.selected_product_id
+        ) combo_sales ON p.id = combo_sales.selected_product_id
+        WHERE p.is_deleted = FALSE
+          AND (single_sales.sold_qty IS NOT NULL OR combo_sales.sold_qty IS NOT NULL)
         ORDER BY quantitySold DESC, productId ASC
-        LIMIT 5
     </select>
 
     <select id="getStockAlerts" resultType="com.project.backend.dto.DashboardDataDTO$ProductStockAlertDTO">

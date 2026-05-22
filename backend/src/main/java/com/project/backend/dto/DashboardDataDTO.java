@@ -25,6 +25,10 @@ public class DashboardDataDTO {
     public static class ProductSalesDTO {
         private Long productId;
         private String productName;
+        private Long categoryId;
+        private String categoryName;
+        private Integer singleSold;
+        private Integer comboSold;
         private Integer quantitySold;
     }
 

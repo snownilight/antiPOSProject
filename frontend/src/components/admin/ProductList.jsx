@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Modal, Form } from 'react-bootstrap';
 import API_BASE_URL from '../../utils/api';
+import useWebSocket from '../../hooks/useWebSocket';
 
 const ProductList = () => {
   const [products, setProducts] = useState([]);
@@ -48,6 +49,12 @@ const ProductList = () => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchProducts();
   }, [fetchProducts]);
+
+  // WebSocket Live Updates (POS-55)
+  useWebSocket('/topic/dashboard', useCallback(() => {
+    console.log('[ProductList] 收到即時庫存/商品狀態更新事件，刷新商品清單...');
+    fetchProducts();
+  }, [fetchProducts]));
 
   const handleClose = () => {
     setShowModal(false);

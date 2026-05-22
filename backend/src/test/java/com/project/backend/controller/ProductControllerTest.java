@@ -1,6 +1,7 @@
 package com.project.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project.backend.common.JwtTokenProvider;
 import com.project.backend.entity.Product;
 import com.project.backend.service.ProductService;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,10 @@ import java.util.Map;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(ProductController.class)
+@WebMvcTest(controllers = ProductController.class, excludeAutoConfiguration = {
+        org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+        org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration.class
+})
 public class ProductControllerTest {
 
     @Autowired
@@ -27,6 +31,9 @@ public class ProductControllerTest {
 
     @MockBean
     private ProductService productService;
+
+    @MockBean
+    private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     private ObjectMapper objectMapper;

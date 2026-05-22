@@ -1,3 +1,19 @@
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS order_item_option;
+DROP TABLE IF EXISTS bundle_item_modifier_group;
+DROP TABLE IF EXISTS bundle_item;
+DROP TABLE IF EXISTS option_modifier_group;
+DROP TABLE IF EXISTS product_modifier_group;
+DROP TABLE IF EXISTS modifier_option;
+DROP TABLE IF EXISTS modifier_group;
+DROP TABLE IF EXISTS order_item;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS dining_table;
+DROP TABLE IF EXISTS product;
+DROP TABLE IF EXISTS category;
+SET FOREIGN_KEY_CHECKS = 1;
+
 -- Category Table
 CREATE TABLE IF NOT EXISTS category (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -154,8 +170,19 @@ ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS parent_id BIGINT NULL;
 ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS bundle_item_id BIGINT NULL;
 ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS bundle_item_name VARCHAR(255) NULL;
 ALTER TABLE bundle_item ADD COLUMN IF NOT EXISTS target_category_id BIGINT NULL;
-ALTER TABLE bundle_item ADD COLUMN IF NOT EXISTS base_allowance DECIMAL(10, 2) DEFAULT 0.00;
 ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS selected_product_id BIGINT NULL;
+
+-- Users Table (POS-54)
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL,
+    role VARCHAR(50) NOT NULL,
+    display_name VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
 
 
 

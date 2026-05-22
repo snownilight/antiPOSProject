@@ -1,6 +1,7 @@
 package com.project.backend.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.project.backend.common.JwtTokenProvider;
 import com.project.backend.entity.Category;
 import com.project.backend.service.CategoryService;
 import org.junit.jupiter.api.Test;
@@ -16,7 +17,10 @@ import java.util.Arrays;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(CategoryController.class)
+@WebMvcTest(controllers = CategoryController.class, excludeAutoConfiguration = {
+        org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration.class,
+        org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration.class
+})
 public class CategoryControllerTest {
 
     @Autowired
@@ -24,6 +28,9 @@ public class CategoryControllerTest {
 
     @MockBean
     private CategoryService categoryService;
+
+    @MockBean
+    private JwtTokenProvider jwtTokenProvider;
 
     @Autowired
     private ObjectMapper objectMapper;

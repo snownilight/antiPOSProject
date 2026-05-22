@@ -20,6 +20,12 @@ public class GlobalExceptionHandler {
         return ApiResponse.error(400, e.getMessage());
     }
 
+    @ExceptionHandler(org.springframework.security.core.AuthenticationException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ApiResponse<String> handleAuthenticationException(org.springframework.security.core.AuthenticationException e) {
+        return ApiResponse.error(401, "帳號或密碼錯誤");
+    }
+
     @ExceptionHandler(NoHandlerFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ApiResponse<String> handleNoHandlerFound(NoHandlerFoundException ex) {

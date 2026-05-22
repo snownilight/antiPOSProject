@@ -4,9 +4,11 @@ import { useSearchParams } from 'react-router-dom';
 import { Spinner, Modal } from 'react-bootstrap';
 import API_BASE_URL from '../utils/api';
 import useWebSocket from '../hooks/useWebSocket';
+import { useAuth } from '../context/AuthContext';
 import './CustomerOrder.css';
 
 const CustomerOrder = () => {
+  const { user, setCustomerSession } = useAuth();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 
@@ -63,6 +65,9 @@ const CustomerOrder = () => {
         const json = await res.json();
         if (json.code === 200) {
           setTable(json.data);
+          if (json.data.jwtToken) {
+            setCustomerSession(json.data.jwtToken, json.data);
+          }
         } else {
           setTableError(json.message || '無效的桌台 Token，請重試或聯絡服務人員。');
         }
@@ -75,11 +80,16 @@ const CustomerOrder = () => {
     };
 
     fetchTable();
-  }, [token]);
+  }, [token, setCustomerSession]);
 
   // 2. Fetch Categories & Products once Table is verified
   useEffect(() => {
     if (!table) return;
+
+    // Wait until customer session has been loaded and matches current table token
+    if (!user || user.role !== 'CUSTOMER' || user.tableToken !== token) {
+      return;
+    }
 
     const fetchMenu = async () => {
       try {
@@ -109,7 +119,7 @@ const CustomerOrder = () => {
     };
 
     fetchMenu();
-  }, [table]);
+  }, [table, user, token]);
 
   // Cart Operations
   // Cart Operations (POS-48)

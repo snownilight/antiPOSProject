@@ -10,4 +10,35 @@
  */
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api';
 
+// Intercept window.fetch to automatically add Authorization header
+const originalFetch = window.fetch;
+window.fetch = async (url, options = {}) => {
+  // If the request is to our API base URL
+  if (typeof url === 'string' && url.startsWith(API_BASE_URL)) {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      options.headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${token}`
+      };
+    }
+  }
+
+  const response = await originalFetch(url, options);
+  
+  // If we get a 401 Unauthorized from the backend, redirect to login or clear auth
+  if (response.status === 401) {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('authUser');
+      // Redirect to login if not already on login or customer pages
+      if (!window.location.pathname.startsWith('/order') && window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+  }
+  return response;
+};
+
 export default API_BASE_URL;

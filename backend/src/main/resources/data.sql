@@ -128,6 +128,9 @@ INSERT IGNORE INTO bundle_item_modifier_group (bundle_item_id, group_id) VALUES 
 -- Bundle Item Modifier Group Mapping (自選飲料 (ID 6) -> 甜度 (Group 1), 冰塊 (Group 2))
 INSERT IGNORE INTO bundle_item_modifier_group (bundle_item_id, group_id) VALUES (6, 1);
 INSERT IGNORE INTO bundle_item_modifier_group (bundle_item_id, group_id) VALUES (6, 2);
-
-
+-- Insert default users
+INSERT IGNORE INTO users (id, username, password, role, display_name) VALUES 
+(1, 'admin', '$2a$10$ODXi7zmlFbYWI.gPa2JVX.g0RB3Hk.1NT1YHl8qNBV77AiEX4sxum', 'ADMIN', '系統管理員'),
+(2, 'waiter', '$2a$10$5ikwpZlPdlwRC9NlLQZ1zOTKFJQ0Z7sWDaSOXmPgyOYH7xYgobGPS', 'WAITER', '服務生甲'),
+(3, 'kitchen', '$2a$10$c61EzBJMU0Xg4AAJUI1xMu6I2BJbPJA7yvkMa33tLfqnkLzeEspeK', 'KITCHEN', '主廚阿輝');
 

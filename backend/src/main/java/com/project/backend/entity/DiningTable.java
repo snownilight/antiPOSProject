@@ -19,6 +19,7 @@ public class DiningTable {
 
     private String status; // EMPTY, OCCUPIED, CLEANING
     private String token;
+    private String jwtToken;
     private Boolean isDeleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

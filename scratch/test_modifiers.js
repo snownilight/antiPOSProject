@@ -1,12 +1,35 @@
 const API_BASE_URL = 'http://localhost:8081/api';
 
+let jwtToken = '';
+
+async function authFetch(url, options = {}) {
+  options.headers = options.headers || {};
+  if (jwtToken) {
+    options.headers['Authorization'] = `Bearer ${jwtToken}`;
+  }
+  return fetch(url, options);
+}
+
 async function runTests() {
   console.log('=== Starting POS-48 Customization & Markup Integration Tests ===\n');
 
   try {
+    // 0. Fetch customer token
+    console.log('0. Fetching customer JWT token using table token (token-t1)...');
+    const tableRes = await fetch(`${API_BASE_URL}/tables/token/token-t1`);
+    if (!tableRes.ok) {
+      throw new Error(`Failed to fetch table by token: ${tableRes.status}`);
+    }
+    const tableJson = await tableRes.json();
+    if (tableJson.code !== 200 || !tableJson.data || !tableJson.data.jwtToken) {
+      throw new Error(`Failed to get customer JWT token: ${tableJson.message}`);
+    }
+    jwtToken = tableJson.data.jwtToken;
+    console.log(`✓ Obtained customer JWT Token\n`);
+
     // 1. Verify Products and Modifier Mapping
     console.log('1. Verifying product modifier group mapping (古早味紅茶)...');
-    const productsRes = await fetch(`${API_BASE_URL}/products`);
+    const productsRes = await authFetch(`${API_BASE_URL}/products`);
     if (!productsRes.ok) {
       throw new Error(`Failed to fetch products: ${productsRes.status}`);
     }
@@ -57,7 +80,7 @@ async function runTests() {
       ]
     };
     
-    const validRes = await fetch(`${API_BASE_URL}/orders`, {
+    const validRes = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(validPayload)
@@ -105,7 +128,7 @@ async function runTests() {
         }
       ]
     };
-    const errRes1 = await fetch(`${API_BASE_URL}/orders`, {
+    const errRes1 = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(missingSweetnessPayload)
@@ -129,7 +152,7 @@ async function runTests() {
         }
       ]
     };
-    const errRes2 = await fetch(`${API_BASE_URL}/orders`, {
+    const errRes2 = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(duplicateSweetnessPayload)
@@ -153,7 +176,7 @@ async function runTests() {
         }
       ]
     };
-    const errRes3 = await fetch(`${API_BASE_URL}/orders`, {
+    const errRes3 = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(crossProductOptionPayload)
@@ -235,7 +258,7 @@ async function runTests() {
       ]
     };
 
-    const structOrderRes = await fetch(`${API_BASE_URL}/orders`, {
+    const structOrderRes = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(structuredPayload)
@@ -295,7 +318,7 @@ async function runTests() {
       ]
     };
 
-    const legacyOrderRes = await fetch(`${API_BASE_URL}/orders`, {
+    const legacyOrderRes = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(legacyPayload)
@@ -348,7 +371,7 @@ async function runTests() {
       ]
     };
 
-    const errRes4 = await fetch(`${API_BASE_URL}/orders`, {
+    const errRes4 = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(missingSweetPayload)
@@ -388,7 +411,7 @@ async function runTests() {
       ]
     };
 
-    const errRes5 = await fetch(`${API_BASE_URL}/orders`, {
+    const errRes5 = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(mismatchPayload)
@@ -423,7 +446,7 @@ async function runTests() {
       ]
     };
 
-    const errRes6 = await fetch(`${API_BASE_URL}/orders`, {
+    const errRes6 = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(invalidBiPayload)
@@ -470,7 +493,7 @@ async function runTests() {
       ]
     };
 
-    const dynamicRes = await fetch(`${API_BASE_URL}/orders`, {
+    const dynamicRes = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dynamicPayload)
@@ -552,7 +575,7 @@ async function runTests() {
       ]
     };
 
-    const mismatchCategoryRes = await fetch(`${API_BASE_URL}/orders`, {
+    const mismatchCategoryRes = await authFetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(mismatchCategoryPayload)

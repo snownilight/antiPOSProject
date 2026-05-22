@@ -14,14 +14,15 @@
   - 連線網址：`jdbc:mysql://localhost:3306/antipos` (帳密 `root`/`root`)。
   - 初始化：透過具有 `IF NOT EXISTS` 與 `INSERT IGNORE` 防重複載入設計的 `schema.sql` 與 `data.sql` 進行。
 - **跨域 CORS 設定**：
-  - 後端集中至 [CorsConfig.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/common/CorsConfig.java)，支援讀取 `application.properties` 中的 `cors.allowed-origins` 屬性。
-  - WebSocket 連線與 REST API 共用相同的 CORS 允許清單。
-- **前端 API 設定**：
-  - 環境變數檔 [frontend/.env](file:///d:/Learing/project/antiPOSProject/frontend/.env) 定義 `VITE_API_BASE_URL=http://localhost:8081/api`。
+  - 後端集中至 [  - 環境變數檔 [frontend/.env](file:///d:/Learing/project/antiPOSProject/frontend/.env) 定義 `VITE_API_BASE_URL=http://localhost:8081/api`。
   - 統一於 [api.js](file:///d:/Learing/project/antiPOSProject/frontend/src/utils/api.js) 中導出 `API_BASE_URL`。
 
 ### 💻 後端架構
 - **開發環境**：Spring Boot 3.2.5 + MyBatis + Lombok + Java 21。
+- **安全與權限控制 (RBAC & JWT)**：
+  - 整合 Spring Security 與無狀態 JWT 驗證。
+  - 支持店員角色（`ADMIN`、`WAITER`、`KITCHEN`）與顧客角色（`CUSTOMER`）之安全認證與存取。
+  - 透過全域過濾器 `JwtAuthenticationFilter` 解析 `Bearer` Token，並在安全配置中為 `/error` 路徑配置 `permitAll()` 防止二次權限阻擋衝突。
 - **異常與錯誤處理**：
   - 採用 `GlobalExceptionHandler` 搭配統一格式的 `ApiResponse`。
   - 服務層 (Service) 例外已收斂為 mapping-compatible exceptions (如 `IllegalArgumentException`)，拋出時會自動轉化為 `400 Bad Request`，保障 API 的防護與穩定度。
@@ -33,6 +34,10 @@
 
 ### 🎨 前端架構
 - **開發環境**：React + Vite + Vanilla CSS。
+- **認證與路由守護 (Route Guards)**：
+  - 全域 `AuthContext` 狀態管理，採用 `localStorage` 同步讀寫機制，徹底排除父子組件 Effect 生命週期競態條件 (Race Condition)。
+  - 封裝 `<ProtectedRoute>`，針對未登入用戶重定向至登入頁，權限不符時導向 `/403` 自定義無權限頁。
+  - 統一攔截 `window.fetch` 以自動附帶 `Authorization: Bearer <token>` 標頭，並於 401 狀態時自動登出。
 - **樣式分離設計**：
   - 所有 JSX 元件的樣式皆已徹底抽離至獨立的 CSS 檔案中（如 `TableList.css`, `CustomerOrder.css` 等），元件代碼乾淨清爽。
 - **WebSocket 連線**：
@@ -42,6 +47,43 @@
   - 外場點餐 (`/admin/order`)：支援鎖定桌台、商品加點與數量備註，並具備 Modal 遮罩殘留清除與 CSS z-index 層級自動修正。
   - 訂單審核與歷史 (`/admin/orders`)：支援搜尋與分類分頁，提供一鍵審核自點訂單、取消及結帳功能。
   - 廚房看板 KDS (`/admin/kitchen`)：即時顯示準備中訂單，並可一鍵流轉製作狀態。
+  - 顧客自助點餐頁 (`/order?token=...`)：顧客 RWD 點餐，包含購物車 Drawer 與 WebSocket 狀態即時更新監聽，並等待顧客認證 Session 準備就緒後再拉取選單，避免存取拒絕。
+
+### 🧪 測試與驗證資源
+- **自動化 E2E 測試**：
+  - 分類、商品與桌台測試：`scratch/test_e2e.js` (含安全性注入防護，共 76 項 API 邊緣條件測試 100% 通過)。
+  - 訂單模組測試：`brain/.../scratch/test_orders.js` (含桌台雙向連動、刪除限制與售罄驗證等 8 大核心情境 100% 通過)。
+  - 結帳功能測試：`scratch/test_checkout.js` (含重複結帳阻擋、明細加總計算，100% 通過)。
+  - WebSocket 測試：`brain/.../scratch/test_websocket.js` (含握手、事件廣播與延遲驗證共 17 項 100% 通過，廣播延遲 25ms)。
+  - 自助點餐整合測試：`scratch/test_qrcode_ordering.js` (涵蓋顧客點餐、待確認、服務生審核、狀態連動與 KDS 接單全流程，100% 通過)。
+- **安全單元測試**：
+  - `JwtTokenProviderTest.java` (驗證管理員與顧客權限宣告載荷)。
+- **Postman 集合檔案**：
+  - 位置：[postman/antiPOS_API_Collection.json](file:///d:/Learing/project/antiPOSProject/postman/antiPOS_API_Collection.json)。
+  - 包含全模組 62 個 API 測試案例。
+
+---
+
+## 2. 已完成的工單與變更
+
+### 📅 2026-05-22 | [Jira: POS-54] 系統權限控管與安全機制 (RBAC & JWT)
+- **後端安全基礎建設與 JWT 整合**：
+  - 引入 `spring-boot-starter-security` 與 `jjwt` 進行無狀態身分驗證。
+  - 實作 `SecurityConfig` 設定全域 API 角色存取規則：開放 `/api/auth/**`、`/api/tables/token/*`、`/api/tables/*/qrcode`、`/ws/**` 等端點，並允許 `/error` 以免錯誤導引被阻攔。
+  - 實作 `JwtAuthenticationFilter` 解析 `Bearer <token>` 請求頭，並注入 `SecurityContext`。
+  - 實作 `JwtTokenProvider` 簽發與驗證管理員 JWT 以及顧客 `CUSTOMER` 暫時 JWT。
+- **使用者認證模型與資料庫整合**：
+  - 新增 `users` 資料表與對應 `User` 實體、Mapper 及 `CustomUserDetailsService`，使用 BCrypt 加密密碼，預設插入 `admin`、`waiter`、`kitchen` 用戶。
+  - 提供 `/api/auth/login` 店員登入 API 簽發 JWT Token。
+- **前端路由守護與 Race Condition 解決**：
+  - 封裝 `<ProtectedRoute>` 依角色阻擋存取，不符權限重定向至 `/403` 頁面。
+  - 重構 `AuthContext` 之 `login`、`logout` 與 `setCustomerSession` 使其同步讀寫 `localStorage`，徹底解決子組件 `useEffect` (請求選單 API) 先於父組件 (同步寫入 Token) 執行所導致的未授權 403 競態錯誤。
+  - 調整 `CustomerOrder.jsx` 控制閥，待顧客 session 同步掛載至 context 後再請求選單與商品。
+- **驗證成果**：
+  - 新增 `JwtTokenProviderTest.java` 進行 Token 安全校驗。
+  - `.\mvnw test` 通過所有安全及業務邏輯測試，`npm run lint` 完全無警告，`npm run build` 打包順暢。
+
+### 📅 2026-05-22 | [Jira: POS-48] 結構化商品客製化選項與加價系統 (含套餐二次客製化)��時顯示準備中訂單，並可一鍵流轉製作狀態。
   - 顧客自助點餐頁 (`/order?token=...`)：顧客 RWD 點餐，包含購物車 Drawer 與 WebSocket 狀態即時更新監聽。
 
 ### 🧪 測試與驗證資源

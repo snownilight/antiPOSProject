@@ -16,6 +16,7 @@ import com.google.zxing.qrcode.QRCodeWriter;
 
 import java.util.List;
 import java.util.Map;
+import com.project.backend.common.JwtTokenProvider;
 
 @RestController
 @RequestMapping("/api/tables")
@@ -26,6 +27,9 @@ public class DiningTableController {
 
     @Autowired
     private DiningTableService diningTableService;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
 
     @GetMapping
     public ApiResponse<List<DiningTable>> getAllTables() {
@@ -96,7 +100,12 @@ public class DiningTableController {
     @GetMapping("/token/{token}")
     public ApiResponse<DiningTable> getTableByToken(@PathVariable String token) {
         try {
-            return ApiResponse.success(diningTableService.getTableByToken(token));
+            DiningTable table = diningTableService.getTableByToken(token);
+            if (table != null) {
+                String jwt = jwtTokenProvider.generateCustomerToken(table.getId(), table.getName(), table.getToken());
+                table.setJwtToken(jwt);
+            }
+            return ApiResponse.success(table);
         } catch (Exception e) {
             return ApiResponse.error(404, e.getMessage());
         }

@@ -8,6 +8,91 @@ import './TableList.css';
 
 const ACTIVE_ORDER_STATUSES = 'PENDING,PREPARING,READY';
 
+const formatOrderOptions = (options) => {
+  if (!options || options.length === 0) return '';
+
+  const parentOptions = options.filter(o => !o.parentId);
+  const childOptions = options.filter(o => o.parentId);
+
+  const childMap = {};
+  childOptions.forEach(child => {
+    const pId = child.parentId;
+    if (!childMap[pId]) {
+      childMap[pId] = [];
+    }
+    childMap[pId].push(child);
+  });
+
+  const formattedParents = parentOptions.map(parent => {
+    const parentChildren = childMap[parent.id] || childMap[parent.optionId] || [];
+    const match = parent.optionName.match(/\(([^)]+)\)/);
+    
+    if (match) {
+      const content = match[1];
+      const rawItems = content.split('+').map(x => x.trim());
+      
+      const cleanedParentName = parent.optionName.replace(/\s*\([^)]*\)/g, '').trim();
+      let parentText = cleanedParentName;
+      if (parent.priceModifier > 0) {
+        parentText += ` (+$${parent.priceModifier})`;
+      }
+
+      const biTexts = [];
+      const isBeverageOrSoup = (name) => {
+        const keywords = ["茶", "奶", "水", "汁", "咖啡", "蜜", "汽水", "可樂", "湯", "飲"];
+        return keywords.some(kw => name.includes(kw));
+      };
+      let legacyTargetIdx = rawItems.findIndex(isBeverageOrSoup);
+      if (legacyTargetIdx === -1) {
+        legacyTargetIdx = rawItems.length - 1;
+      }
+
+      rawItems.forEach((subName, idx) => {
+        const subOpts = parentChildren.filter(c => c.bundleItemName === subName);
+        const legacyOpts = parentChildren.filter(c => !c.bundleItemName);
+        
+        const allOptsForSub = [...subOpts];
+        if (idx === legacyTargetIdx && legacyOpts.length > 0) {
+          allOptsForSub.push(...legacyOpts);
+        }
+
+        if (allOptsForSub.length > 0) {
+          const subOptNames = allOptsForSub.map(c => {
+            let name = c.optionName;
+            if (c.priceModifier > 0) {
+              name += `(+$${c.priceModifier})`;
+            }
+            return name;
+          }).join('、');
+          biTexts.push(`${subName}（${subOptNames}）`);
+        } else {
+          biTexts.push(subName);
+        }
+      });
+
+      return `${parentText}：${biTexts.join(' / ')}`;
+    }
+
+    let text = parent.optionName;
+    if (parent.priceModifier > 0) {
+      text += ` (+$${parent.priceModifier})`;
+    }
+    if (parentChildren.length > 0) {
+      const childrenText = parentChildren.map(c => {
+        let cText = c.optionName;
+        if (c.priceModifier > 0) {
+          cText += `(+$${c.priceModifier})`;
+        }
+        return cText;
+      }).join(' / ');
+      text += ` (${childrenText})`;
+    }
+    return text;
+  });
+
+  return formattedParents.join(' / ');
+};
+
 const TableList = () => {
   const navigate = useNavigate();
   const [tables, setTables] = useState([]);
@@ -447,12 +532,19 @@ const TableList = () => {
                   </div>
                   <div className="d-flex flex-column gap-2 mb-2">
                     {order.items?.map(item => (
-                      <div key={item.id} className="d-flex justify-content-between text-secondary" style={{fontSize: '14px'}}>
-                        <span>
-                          {item.productName} <span className="text-dark fw-semibold">x{item.quantity}</span>
-                          {item.note && <span className="ms-2 badge bg-light text-muted border" style={{fontSize: '10px'}}>{item.note}</span>}
-                        </span>
-                        <span>${item.subtotal}</span>
+                      <div key={item.id} className="d-flex justify-content-between text-secondary align-items-start" style={{fontSize: '14px'}}>
+                        <div style={{ flex: 1, marginRight: '16px' }}>
+                          <div>
+                            {item.productName} <span className="text-dark fw-semibold">x{item.quantity}</span>
+                            {item.note && <span className="ms-2 badge bg-light text-muted border" style={{fontSize: '10px'}}>{item.note}</span>}
+                          </div>
+                          {item.options && item.options.length > 0 && (
+                            <div className="text-muted" style={{ fontSize: '12px', paddingLeft: '8px', marginTop: '2px' }}>
+                              {formatOrderOptions(item.options)}
+                            </div>
+                          )}
+                        </div>
+                        <span className="align-self-start">${item.subtotal}</span>
                       </div>
                     ))}
                   </div>

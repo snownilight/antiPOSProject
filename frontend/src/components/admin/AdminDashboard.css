@@ -73,7 +73,7 @@
 
 .metric-label {
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
   margin-bottom: 4px;
 }
 
@@ -83,15 +83,15 @@
   margin: 0;
 }
 
-/* Colors matching dark theme design system */
-.bg-indigo-light { background: rgba(99, 102, 241, 0.15); }
-.text-indigo { color: #818cf8; }
+/* Colors matching design system */
+.bg-indigo-light { background: rgba(99, 102, 241, 0.12); }
+.text-indigo { color: #4f46e5; }
 
-.bg-teal-light { background: rgba(20, 184, 166, 0.15); }
-.text-teal { color: #2dd4bf; }
+.bg-teal-light { background: rgba(20, 184, 166, 0.12); }
+.text-teal { color: #0f766e; }
 
-.bg-amber-light { background: rgba(245, 158, 11, 0.15); }
-.text-amber { color: #fbbf24; }
+.bg-amber-light { background: rgba(245, 158, 11, 0.12); }
+.text-amber { color: #b45309; }
 
 /* Donut Chart Styling */
 .chart-layout {
@@ -123,20 +123,20 @@
 
 .donut-center-title {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
   margin-bottom: 2px;
 }
 
 .donut-center-value {
   font-size: 20px;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary);
   line-height: 1.2;
 }
 
 .donut-center-subtitle {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-secondary);
 }
 
 .chart-legend {
@@ -149,7 +149,7 @@
 }
 
 .legend-item:hover, .legend-item.active-row {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .legend-badge {
@@ -162,12 +162,12 @@
 
 .legend-name {
   font-size: 14px;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .legend-value {
   font-size: 14px;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .legend-percent {

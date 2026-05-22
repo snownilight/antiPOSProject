@@ -68,6 +68,10 @@
 - **後端架構與業務邏輯**：
   - 實體類新增對應屬性，擴充 MyBatis ResultMap 級聯加載一級與二級客製化群組。
   - 於 `OrderServiceImpl` 的 `createOrder` 方法中實作客製化防護驗證與動態加價計算，支援一級與二級客製化群組之 `minSelection`/`maxSelection` 遞迴驗證，並在訂單存檔時以正確的 `parentId` 層級關係存入資料庫。
+- **套餐分類自選品項與補差額計算 (動態套餐項目)**：
+  - **資料庫與測試資料**：修改 `schema.sql` 與 `data.sql`，為 `bundle_item` 引入 `target_category_id` (指定分類自選) 與 `base_allowance` (基本折抵額)；為 `order_item_option` 新增 `selected_product_id` 紀錄實際選定的自選商品。新增「升級 C 套餐 (自選小菜 + 自選飲料)」測試資料、小菜新品項 (黃金泡菜、皮蛋豆腐) 等。
+  - **後端商務與驗證邏輯**：在 `OrderServiceImpl` 中檢驗自選商品的分類匹配度與供應狀態 (`AVAILABLE`)，並計算超額差額 `MAX(0, product.price - base_allowance)` 累加為套餐修飾加價，並在資料庫保存對應的 `selected_product_id` 以完成關聯紀錄。
+  - **前端互動 UI**：在 `CustomerOrder` (前台自點) 與 `OrderInterface` (外場點餐) 引入動態商品分區按鈕 (Pills)，實時呈現各品項超額的額外補差價、將選定品項對應 ID 與二級客製化組合為正確的 JSON Payload 進行送單，並於 `TableList`、`OrderList` 及 `KitchenDisplay` (KDS) 正確轉譯並印出實際自選商品的名稱與加價（例如：`黃金泡菜(+$5)` 替代原本的分類佔位符）。
 - **前端介面與客製化 Modal**：
   - 顧客自助點餐與外場點餐介面中，針對一級客製化選項下方新增二級客製化群組的嵌套展開與收合。
   - 實作切換或取消父選項時自動清除子選項選擇狀態的防錯邏輯，以及針對子選項的必選初始化設定。
@@ -76,7 +80,7 @@
 - **廚房看板 (KDS) 套餐直列顯示**：
   - 修改 `KitchenDisplay` 的解析渲染邏輯，若品項為套餐升級，則自動解析為直列子項目（如 `- 燙青菜`、`- 紅茶 [無糖] [去冰]`），其餘一般客製化選項則維持以 Badge 形式呈現在下方，有效防範廚房漏看。
 - **自動化測試驗證**：
-  - 擴充 `scratch/test_modifiers.js` 整合測試，涵蓋商品選項查詢、防護限制、動態價格計算、錯誤傳參攔截，以及 Case 6/Case 7 (套餐二次客製化 E2E 正確創單、計價、parent_id 映射與漏選必填二次客製化之 400 阻擋防禦)，測試 100% 通過。
+  - 擴充 `scratch/test_modifiers.js` 整合測試，涵蓋商品選項查詢、防護限制、動態價格計算、錯誤傳參攔截，以及 Case 6/Case 7 (套餐二次客製化 E2E 正確創單、計價、parent_id 映射與漏選必填二次客製化之 400 阻擋防禦)，以及 Case 12/Case 13 (動態自選套餐訂單建立、差額計算及分類防護驗證)，測試 100% 通過。
 
 ### 📅 2026-05-21 | [Jira: POS-47] 第一階段專案審視與優化
 - **後端優化**：

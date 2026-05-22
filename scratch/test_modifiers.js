@@ -435,6 +435,135 @@ async function runTests() {
     }
     console.log('✓ Invalid bundle item ID validation passed.\n');
 
+    // 12. Dynamic Bundle Item Selection & Markup Validation (Case 8)
+    console.log('12. Creating dynamic bundle set meal order with markup (Case 8)...');
+    // Product 1 (招牌滷肉飯 [$50]), Option 14 (升級 C 套餐 [+$70])
+    // Bundle Item 5 (自選小菜, Category 2, Allowance $20): selectedProduct 10 (黃金泡菜, Price $25, excess $5)
+    // Bundle Item 6 (自選飲料, Category 3, Allowance $30): selectedProduct 5 (古早味紅茶, Price $30, excess $0)
+    //   Sub-options under bundle item 6: Option 4 (無糖 [+$0]), Option 8 (去冰 [+$0])
+    // Expected total: $50 + $70 + $5 + $0 = $125.00
+    const dynamicPayload = {
+      tableId: 1,
+      items: [
+        {
+          productId: 1,
+          quantity: 1,
+          note: '自選套餐價差客製化測試',
+          selectedOptions: [
+            {
+              optionId: 14,
+              bundleItems: [
+                {
+                  bundleItemId: 5,
+                  selectedProductId: 10, // 黃金泡菜
+                  optionIds: []
+                },
+                {
+                  bundleItemId: 6,
+                  selectedProductId: 5, // 古早味紅茶
+                  optionIds: [4, 8] // 無糖, 去冰
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    const dynamicRes = await fetch(`${API_BASE_URL}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(dynamicPayload)
+    });
+    const dynamicJson = await dynamicRes.json();
+    if (dynamicJson.code !== 200) {
+      throw new Error(`Failed to create order with dynamic bundle payload: ${dynamicJson.message}`);
+    }
+
+    const dOrder = dynamicJson.data;
+    console.log(`✓ Dynamic Bundle Order Created: ${dOrder.orderNo}`);
+    console.log(`Total amount: $${dOrder.totalAmount} (Expected: $125.00)`);
+    if (parseFloat(dOrder.totalAmount) !== 125.00) {
+      throw new Error(`Expected total amount to be 125.00, got ${dOrder.totalAmount}`);
+    }
+
+    const dItem = dOrder.items[0];
+    console.log(`Options Count: ${dItem.options?.length} (Expected: 5)`);
+    if (!dItem.options || dItem.options.length !== 5) {
+      throw new Error(`Expected 5 options for dynamic bundle order item, got ${dItem.options?.length}`);
+    }
+
+    const dynamicParentOpt = dItem.options.find(o => o.optionId === 14 && o.parentId === null);
+    const cabbageOpt = dItem.options.find(o => o.selectedProductId === 10);
+    const teaOpt = dItem.options.find(o => o.selectedProductId === 5);
+    const teaSweetOpt = dItem.options.find(o => o.optionId === 4);
+    const teaIceOpt = dItem.options.find(o => o.optionId === 8);
+
+    if (!dynamicParentOpt || !cabbageOpt || !teaOpt || !teaSweetOpt || !teaIceOpt) {
+      throw new Error('Could not find all expected options in dynamic bundle response');
+    }
+
+    console.log(`Parent Option DB ID: ${dynamicParentOpt.id}, priceModifier: $${dynamicParentOpt.priceModifier} (Expected: $70.00)`);
+    console.log(`Cabbage Option: ${cabbageOpt.optionName}, selectedProductId: ${cabbageOpt.selectedProductId}, priceModifier: $${cabbageOpt.priceModifier} (Expected: $5.00), parentId: ${cabbageOpt.parentId}`);
+    console.log(`Tea Option: ${teaOpt.optionName}, selectedProductId: ${teaOpt.selectedProductId}, priceModifier: $${teaOpt.priceModifier} (Expected: $0.00), parentId: ${teaOpt.parentId}`);
+
+    if (parseFloat(dynamicParentOpt.priceModifier) !== 70.00) {
+      throw new Error(`Expected parent option price modifier to be 70.00, got ${dynamicParentOpt.priceModifier}`);
+    }
+    if (parseFloat(cabbageOpt.priceModifier) !== 5.00) {
+      throw new Error(`Expected selected product cabbage price modifier to be 5.00, got ${cabbageOpt.priceModifier}`);
+    }
+    if (parseFloat(teaOpt.priceModifier) !== 0.00) {
+      throw new Error(`Expected selected product tea price modifier to be 0.00, got ${teaOpt.priceModifier}`);
+    }
+    if (cabbageOpt.parentId !== dynamicParentOpt.id || cabbageOpt.bundleItemId !== 5 || cabbageOpt.bundleItemName !== '自選小菜') {
+      throw new Error('Cabbage option bundle relation mismatch');
+    }
+    if (teaOpt.parentId !== dynamicParentOpt.id || teaOpt.bundleItemId !== 6 || teaOpt.bundleItemName !== '自選飲料') {
+      throw new Error('Tea option bundle relation mismatch');
+    }
+    if (teaSweetOpt.parentId !== dynamicParentOpt.id || teaSweetOpt.bundleItemId !== 6 || teaSweetOpt.bundleItemName !== '自選飲料') {
+      throw new Error('Sub sweetness option relation mismatch');
+    }
+    console.log('✓ Dynamic bundle item selection and markup calculation verified.\n');
+
+    // 13. Dynamic Bundle Category Mismatch Validation (Case 9)
+    console.log('13. Verifying category mismatch validation for dynamic bundle (Case 9)...');
+    // Supplying product 5 (古早味紅茶, Category 3) to bundleItem 5 (自選小菜, Category 2)
+    const mismatchCategoryPayload = {
+      tableId: 1,
+      items: [
+        {
+          productId: 1,
+          quantity: 1,
+          selectedOptions: [
+            {
+              optionId: 14,
+              bundleItems: [
+                {
+                  bundleItemId: 5,
+                  selectedProductId: 5, // Red tea (Category 3) instead of Category 2
+                  optionIds: []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    const mismatchCategoryRes = await fetch(`${API_BASE_URL}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mismatchCategoryPayload)
+    });
+    const mismatchCategoryJson = await mismatchCategoryRes.json();
+    console.log(`Status code: ${mismatchCategoryRes.status}, Message: "${mismatchCategoryJson.message}"`);
+    if (mismatchCategoryRes.status !== 400 || !mismatchCategoryJson.message.includes('不屬於') || !mismatchCategoryJson.message.includes('指定分類')) {
+      throw new Error('Expected 400 Bad Request for dynamic bundle item category mismatch');
+    }
+    console.log('✓ Category mismatch validation passed.\n');
+
     console.log('==================================================');
     console.log('🎉 ALL INTEGRATION TESTS PASSED SUCCESSFULLY! 🎉');
     console.log('==================================================');

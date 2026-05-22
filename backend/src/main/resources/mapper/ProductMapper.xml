@@ -44,6 +44,8 @@
         <id property="id" column="id" />
         <result property="optionId" column="option_id" />
         <result property="name" column="name" />
+        <result property="targetCategoryId" column="target_category_id" />
+        <result property="baseAllowance" column="base_allowance" />
         <result property="sortOrder" column="sort_order" />
         <result property="isDeleted" column="is_deleted" />
         <result property="createdAt" column="created_at" />

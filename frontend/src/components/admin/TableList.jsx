@@ -57,14 +57,36 @@ const formatOrderOptions = (options) => {
         }
 
         if (allOptsForSub.length > 0) {
-          const subOptNames = allOptsForSub.map(c => {
-            let name = c.optionName;
-            if (c.priceModifier > 0) {
-              name += `(+$${c.priceModifier})`;
+          const prodOpt = allOptsForSub.find(c => c.selectedProductId);
+          const subOptsWithoutProd = allOptsForSub.filter(c => !c.selectedProductId);
+
+          if (prodOpt) {
+            let prodName = prodOpt.optionName;
+            if (prodOpt.priceModifier > 0) {
+              prodName += `(+$${prodOpt.priceModifier})`;
             }
-            return name;
-          }).join('、');
-          biTexts.push(`${subName}（${subOptNames}）`);
+            if (subOptsWithoutProd.length > 0) {
+              const subOptNames = subOptsWithoutProd.map(c => {
+                let name = c.optionName;
+                if (c.priceModifier > 0) {
+                  name += `(+$${c.priceModifier})`;
+                }
+                return name;
+              }).join('、');
+              biTexts.push(`${prodName}（${subOptNames}）`);
+            } else {
+              biTexts.push(prodName);
+            }
+          } else {
+            const subOptNames = allOptsForSub.map(c => {
+              let name = c.optionName;
+              if (c.priceModifier > 0) {
+                name += `(+$${c.priceModifier})`;
+              }
+              return name;
+            }).join('、');
+            biTexts.push(`${subName}（${subOptNames}）`);
+          }
         } else {
           biTexts.push(subName);
         }

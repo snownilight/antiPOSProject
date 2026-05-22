@@ -111,6 +111,7 @@ public class OrderServiceImpl implements OrderService {
             // 1. 初始化並標準化所選選項
             Set<Long> primaryOptionIds = new java.util.HashSet<>();
             Map<Long, Map<Long, List<Long>>> bundleSelections = new java.util.HashMap<>(); // parentOptionId -> (bundleItemId -> list of childOptionIds)
+            Map<Long, Long> bundleSelectedProducts = new java.util.HashMap<>(); // bundleItemId -> selectedProductId
             Map<Long, List<Long>> legacySubOptionSelections = new java.util.HashMap<>(); // parentOptionId -> list of childOptionIds
 
             if (itemReq.getSelectedOptions() != null && !itemReq.getSelectedOptions().isEmpty()) {
@@ -122,6 +123,9 @@ public class OrderServiceImpl implements OrderService {
                         for (com.project.backend.dto.OrderItemCreateRequest.BundleItemSelection biSel : selOpt.getBundleItems()) {
                             if (biSel.getOptionIds() != null) {
                                 biMap.put(biSel.getBundleItemId(), biSel.getOptionIds());
+                            }
+                            if (biSel.getSelectedProductId() != null) {
+                                bundleSelectedProducts.put(biSel.getBundleItemId(), biSel.getSelectedProductId());
                             }
                         }
                         bundleSelections.put(selOpt.getOptionId(), biMap);
@@ -269,6 +273,26 @@ public class OrderServiceImpl implements OrderService {
                             }
                         }
 
+                        // 驗證自選套餐子餐點所選商品與分類
+                        if (bi.getTargetCategoryId() != null) {
+                            Long selectedProductId = bundleSelectedProducts.get(bi.getId());
+                            if (selectedProductId == null) {
+                                throw new IllegalArgumentException("開單失敗：套餐子餐點「" + bi.getName() + "」必須選擇一個商品");
+                            }
+                            Product selectedProduct;
+                            try {
+                                selectedProduct = productService.getProductById(selectedProductId);
+                            } catch (Exception e) {
+                                throw new IllegalArgumentException("開單失敗：找不到套餐子餐點所選的商品 (ID: " + selectedProductId + ")");
+                            }
+                            if (!"AVAILABLE".equalsIgnoreCase(selectedProduct.getStatus())) {
+                                throw new IllegalArgumentException("開單失敗：套餐子餐點所選商品「" + selectedProduct.getName() + "」已售罄或暫不供應");
+                            }
+                            if (!bi.getTargetCategoryId().equals(selectedProduct.getCategoryId())) {
+                                throw new IllegalArgumentException("開單失敗：所選商品「" + selectedProduct.getName() + "」不屬於套餐子餐點「" + bi.getName() + "」的指定分類");
+                            }
+                        }
+
                         // 驗證子餐點客製化群組的數量限制
                         if (bi.getModifierGroups() != null) {
                             for (com.project.backend.entity.ModifierGroup subGroup : bi.getModifierGroups()) {
@@ -395,6 +419,28 @@ public class OrderServiceImpl implements OrderService {
                             Map<Long, List<Long>> biSelections = bundleSelections.getOrDefault(opt.getId(), new java.util.HashMap<>());
                             for (com.project.backend.entity.BundleItem bi : opt.getBundleItems()) {
                                 List<Long> selectedBiOptIds = biSelections.getOrDefault(bi.getId(), new ArrayList<>());
+                                
+                                // 如果是自選商品套餐子餐點，需先建立所選商品的 OrderItemOption 與計算超額差額
+                                if (bi.getTargetCategoryId() != null) {
+                                    Long selectedProductId = bundleSelectedProducts.get(bi.getId());
+                                    Product selectedProduct = productService.getProductById(selectedProductId);
+                                    BigDecimal allowance = bi.getBaseAllowance() != null ? bi.getBaseAllowance() : BigDecimal.ZERO;
+                                    BigDecimal diff = selectedProduct.getPrice().subtract(allowance);
+                                    BigDecimal diffPrice = diff.compareTo(BigDecimal.ZERO) > 0 ? diff : BigDecimal.ZERO;
+                                    
+                                    priceModifierSum = priceModifierSum.add(diffPrice);
+                                    
+                                    OrderItemOption selectProdOpt = new OrderItemOption();
+                                    selectProdOpt.setOptionId(opt.getId()); // 用套餐選項 ID 作為 optionId 以滿足外鍵約束
+                                    selectProdOpt.setOptionName(selectedProduct.getName());
+                                    selectProdOpt.setPriceModifier(diffPrice);
+                                    selectProdOpt.setParentId(opt.getId());
+                                    selectProdOpt.setBundleItemId(bi.getId());
+                                    selectProdOpt.setBundleItemName(bi.getName());
+                                    selectProdOpt.setSelectedProductId(selectedProduct.getId());
+                                    selectedOptions.add(selectProdOpt);
+                                }
+
                                 if (bi.getModifierGroups() != null) {
                                     for (com.project.backend.entity.ModifierGroup subGroup : bi.getModifierGroups()) {
                                         if (subGroup.getOptions() == null) continue;

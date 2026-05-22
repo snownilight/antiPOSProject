@@ -31,6 +31,7 @@ public class OrderItemCreateRequest {
     @Data
     public static class BundleItemSelection {
         private Long bundleItemId;
+        private Long selectedProductId;
         private List<Long> optionIds;
     }
 }

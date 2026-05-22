@@ -1,6 +1,7 @@
 package com.project.backend.entity;
 
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -9,6 +10,8 @@ public class BundleItem {
     private Long id;
     private Long optionId;
     private String name;
+    private Long targetCategoryId;
+    private BigDecimal baseAllowance;
     private Integer sortOrder;
     private Boolean isDeleted;
     private LocalDateTime createdAt;

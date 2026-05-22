@@ -62,8 +62,17 @@ const renderKdsItemOptionsAndSubItems = (item) => {
           }
 
           if (allOptsForSub.length > 0) {
-            const childrenText = allOptsForSub.map(c => `[${c.optionName}]`).join(' ');
-            subItems.push(`${subName} ${childrenText}`);
+            const prodOpt = allOptsForSub.find(c => c.selectedProductId);
+            const subOptsWithoutProd = allOptsForSub.filter(c => !c.selectedProductId);
+
+            const displayName = prodOpt ? prodOpt.optionName : subName;
+            
+            if (subOptsWithoutProd.length > 0) {
+              const childrenText = subOptsWithoutProd.map(c => `[${c.optionName}]`).join(' ');
+              subItems.push(`${displayName} ${childrenText}`);
+            } else {
+              subItems.push(displayName);
+            }
           } else {
             subItems.push(subName);
           }

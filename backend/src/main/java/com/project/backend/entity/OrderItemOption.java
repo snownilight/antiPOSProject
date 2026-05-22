@@ -14,5 +14,6 @@ public class OrderItemOption {
     private Long parentId;
     private Long bundleItemId;
     private String bundleItemName;
+    private Long selectedProductId;
     private LocalDateTime createdAt;
 }

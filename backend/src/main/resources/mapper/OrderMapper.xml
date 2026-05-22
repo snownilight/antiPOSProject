@@ -132,14 +132,14 @@
 
     <!-- Selected options queries and inserts -->
     <insert id="insertOrderItemOption" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO order_item_option (order_item_id, option_id, option_name, price_modifier, parent_id, bundle_item_id, bundle_item_name)
-        VALUES (#{orderItemId}, #{optionId}, #{optionName}, #{priceModifier}, #{parentId}, #{bundleItemId}, #{bundleItemName})
+        INSERT INTO order_item_option (order_item_id, option_id, option_name, price_modifier, parent_id, bundle_item_id, bundle_item_name, selected_product_id)
+        VALUES (#{orderItemId}, #{optionId}, #{optionName}, #{priceModifier}, #{parentId}, #{bundleItemId}, #{bundleItemName}, #{selectedProductId})
     </insert>
 
     <select id="findOptionsByOrderItemId" resultType="com.project.backend.entity.OrderItemOption">
         SELECT 
             id, order_item_id AS orderItemId, option_id AS optionId, option_name AS optionName, price_modifier AS priceModifier, 
-            parent_id AS parentId, bundle_item_id AS bundleItemId, bundle_item_name AS bundleItemName, created_at AS createdAt 
+            parent_id AS parentId, bundle_item_id AS bundleItemId, bundle_item_name AS bundleItemName, selected_product_id AS selectedProductId, created_at AS createdAt 
         FROM order_item_option 
         WHERE order_item_id = #{orderItemId} 
         ORDER BY id ASC

@@ -26,6 +26,15 @@ VALUES (5, 3, '古早味紅茶', '微甜不膩的經典紅茶', 30.00, 'https://
 INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, is_deleted) 
 VALUES (6, 3, '隱藏版特調', '已刪除的商品測試', 99.00, 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', TRUE);
 
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
+VALUES (10, 2, '黃金泡菜', '黃金比例醃製酸甜脆口', 25.00, 'https://images.unsplash.com/photo-1627962491560-f4b679b380f2?q=80&w=600&auto=format&fit=crop', 'AVAILABLE');
+
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
+VALUES (11, 2, '皮蛋豆腐', '經典爽口涼拌菜', 35.00, 'https://images.unsplash.com/photo-1627962491560-f4b679b380f2?q=80&w=600&auto=format&fit=crop', 'AVAILABLE');
+
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
+VALUES (9, 3, '珍珠奶茶', '濃郁奶香與Q彈珍珠的完美結合', 50.00, 'https://images.unsplash.com/photo-1576092762791-dd9e2220abd4?q=80&w=600&auto=format&fit=crop', 'AVAILABLE');
+
 -- Insert default dining tables
 INSERT IGNORE INTO dining_table (id, name, seats, status, token) VALUES (1, 'T1', 2, 'EMPTY', 'token-t1');
 INSERT IGNORE INTO dining_table (id, name, seats, status, token) VALUES (2, 'T2', 2, 'EMPTY', 'token-t2');
@@ -72,12 +81,18 @@ INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (
 -- 套餐升級 (Group 4)
 INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (12, 4, '升級 A 套餐 (燙青菜 + 貢丸湯)', 50.00);
 INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (13, 4, '升級 B 套餐 (燙青菜 + 紅茶)', 60.00);
+INSERT IGNORE INTO modifier_option (id, group_id, name, price_modifier) VALUES (14, 4, '升級 C 套餐 (自選小菜 + 自選飲料)', 70.00);
 
 -- Product Modifier Group mapping
 -- 古早味紅茶 (Product 5) -> 甜度 (Group 1), 冰塊 (Group 2), 加料 (Group 3)
 INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (5, 1);
 INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (5, 2);
 INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (5, 3);
+
+-- 珍珠奶茶 (Product 9) -> 甜度 (Group 1), 冰塊 (Group 2), 加料 (Group 3)
+INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (9, 1);
+INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (9, 2);
+INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (9, 3);
 
 -- 招牌滷肉飯 (Product 1) -> 套餐升級 (Group 4)
 INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (1, 4);
@@ -89,6 +104,10 @@ INSERT IGNORE INTO product_modifier_group (product_id, group_id) VALUES (2, 4);
 INSERT IGNORE INTO option_modifier_group (option_id, group_id) VALUES (13, 1);
 INSERT IGNORE INTO option_modifier_group (option_id, group_id) VALUES (13, 2);
 
+-- Option Modifier Group Mapping (Option 14 "升級 C 套餐" -> Sweetness Group 1, Ice Group 2)
+INSERT IGNORE INTO option_modifier_group (option_id, group_id) VALUES (14, 1);
+INSERT IGNORE INTO option_modifier_group (option_id, group_id) VALUES (14, 2);
+
 -- Insert Bundle Items
 -- B 套餐 (Option 13) -> 燙青菜 (ID 1), 紅茶 (ID 2)
 INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (1, 13, '燙青菜', 0);
@@ -98,9 +117,17 @@ INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (2, 13, 
 INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (3, 12, '燙青菜', 0);
 INSERT IGNORE INTO bundle_item (id, option_id, name, sort_order) VALUES (4, 12, '貢丸湯', 1);
 
+-- C 套餐 (Option 14) -> 自選小菜 (ID 5, Category 2, Allowance $20), 自選飲料 (ID 6, Category 3, Allowance $30)
+INSERT IGNORE INTO bundle_item (id, option_id, name, target_category_id, base_allowance, sort_order) VALUES (5, 14, '自選小菜', 2, 20.00, 0);
+INSERT IGNORE INTO bundle_item (id, option_id, name, target_category_id, base_allowance, sort_order) VALUES (6, 14, '自選飲料', 3, 30.00, 1);
+
 -- Bundle Item Modifier Group Mapping (紅茶 (ID 2) -> 甜度 (Group 1), 冰塊 (Group 2))
 INSERT IGNORE INTO bundle_item_modifier_group (bundle_item_id, group_id) VALUES (2, 1);
 INSERT IGNORE INTO bundle_item_modifier_group (bundle_item_id, group_id) VALUES (2, 2);
+
+-- Bundle Item Modifier Group Mapping (自選飲料 (ID 6) -> 甜度 (Group 1), 冰塊 (Group 2))
+INSERT IGNORE INTO bundle_item_modifier_group (bundle_item_id, group_id) VALUES (6, 1);
+INSERT IGNORE INTO bundle_item_modifier_group (bundle_item_id, group_id) VALUES (6, 2);
 
 
 

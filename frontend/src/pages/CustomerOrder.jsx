@@ -31,6 +31,7 @@ const CustomerOrder = () => {
   // Customization State (POS-48)
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedOptions, setSelectedOptions] = useState({}); // groupId -> array of optionIds
+  const [selectedBundleProducts, setSelectedBundleProducts] = useState({}); // bundleItemId -> selectedProductId
   const [showCustomModal, setShowCustomModal] = useState(false);
 
   // Order Submission State
@@ -164,7 +165,7 @@ const CustomerOrder = () => {
     return activeGroups;
   };
 
-  const calculateOptionsPriceSum = (product, optionIds) => {
+  const calculateOptionsPriceSum = (product, optionIds, bundleProds = selectedBundleProducts) => {
     if (!product.modifierGroups || !optionIds || optionIds.length === 0) return 0;
     let sum = 0;
     
@@ -174,13 +175,25 @@ const CustomerOrder = () => {
           group.options.forEach(opt => {
             if (optionIds.includes(opt.id)) {
               sum += opt.priceModifier;
-            }
-            if (opt.bundleItems) {
-              opt.bundleItems.forEach(bi => {
-                if (bi.modifierGroups) {
-                  scanGroups(bi.modifierGroups);
-                }
-              });
+              if (opt.bundleItems) {
+                opt.bundleItems.forEach(bi => {
+                  if (bi.targetCategoryId) {
+                    const selProdId = bundleProds?.[bi.id];
+                    if (selProdId) {
+                      const selProd = products.find(p => p.id === selProdId);
+                      if (selProd) {
+                        const diff = selProd.price - (bi.baseAllowance || 0);
+                        if (diff > 0) {
+                          sum += diff;
+                        }
+                      }
+                    }
+                  }
+                  if (bi.modifierGroups) {
+                    scanGroups(bi.modifierGroups);
+                  }
+                });
+              }
             }
             if (opt.modifierGroups) {
               scanGroups(opt.modifierGroups);
@@ -194,7 +207,7 @@ const CustomerOrder = () => {
     return sum;
   };
 
-  const getOptionNamesText = (product, optionIds) => {
+  const getOptionNamesText = (product, optionIds, bundleProds) => {
     if (!product.modifierGroups || !optionIds || optionIds.length === 0) return '';
     
     const formatOption = (opt) => {
@@ -213,6 +226,21 @@ const CustomerOrder = () => {
         
         const biTexts = [];
         opt.bundleItems.forEach(bi => {
+          let displayName = bi.name;
+          let diffPriceText = '';
+          
+          if (bi.targetCategoryId && bundleProds) {
+            const selProdId = bundleProds[bi.id];
+            const selProd = products.find(p => p.id === selProdId);
+            if (selProd) {
+              displayName = selProd.name;
+              const diff = selProd.price - (bi.baseAllowance || 0);
+              if (diff > 0) {
+                diffPriceText = `(+$${diff})`;
+              }
+            }
+          }
+          
           const selectedSubOpts = [];
           if (bi.modifierGroups) {
             bi.modifierGroups.forEach(subGroup => {
@@ -230,9 +258,9 @@ const CustomerOrder = () => {
             });
           }
           if (selectedSubOpts.length > 0) {
-            biTexts.push(`${bi.name}（${selectedSubOpts.join('、')}）`);
+            biTexts.push(`${displayName}${diffPriceText}（${selectedSubOpts.join('、')}）`);
           } else {
-            biTexts.push(bi.name);
+            biTexts.push(`${displayName}${diffPriceText}`);
           }
         });
         
@@ -276,12 +304,28 @@ const CustomerOrder = () => {
     if (product.modifierGroups && product.modifierGroups.length > 0) {
       setSelectedProduct(product);
       const initial = {};
+      const initialBundleProducts = {};
       
       const initGroup = (group) => {
         const defaultOptions = [];
         if (group.minSelection === 1 && group.maxSelection === 1 && group.options && group.options.length > 0) {
           const defaultOpt = group.options[0];
           defaultOptions.push(defaultOpt.id);
+          
+          if (defaultOpt.bundleItems) {
+            defaultOpt.bundleItems.forEach(bi => {
+              if (bi.targetCategoryId) {
+                const available = products.filter(p => p.categoryId === bi.targetCategoryId && p.status === 'AVAILABLE' && !p.isDeleted);
+                if (available.length > 0) {
+                  initialBundleProducts[bi.id] = available[0].id;
+                }
+              }
+              if (bi.modifierGroups) {
+                bi.modifierGroups.forEach(initGroup);
+              }
+            });
+          }
+          
           if (defaultOpt.modifierGroups) {
             defaultOpt.modifierGroups.forEach(initGroup);
           }
@@ -291,18 +335,20 @@ const CustomerOrder = () => {
       
       product.modifierGroups.forEach(initGroup);
       setSelectedOptions(initial);
+      setSelectedBundleProducts(initialBundleProducts);
       setShowCustomModal(true);
     } else {
-      addCustomizedToCart(product, [], '');
+      addCustomizedToCart(product, [], '', {});
     }
   };
 
-  const addCustomizedToCart = (product, optionIds, note) => {
+  const addCustomizedToCart = (product, optionIds, note, bundleProds = selectedBundleProducts) => {
     const sortedOptionIds = [...optionIds].sort((a, b) => a - b);
     setCart(prevCart => {
       const existingIdx = prevCart.findIndex(item => 
         item.product.id === product.id && 
         JSON.stringify(item.optionIds) === JSON.stringify(sortedOptionIds) &&
+        JSON.stringify(item.bundleSelectedProducts) === JSON.stringify(bundleProds) &&
         item.note === note
       );
       if (existingIdx > -1) {
@@ -310,9 +356,9 @@ const CustomerOrder = () => {
         newCart[existingIdx].quantity += 1;
         return newCart;
       }
-      const optionsPriceSum = calculateOptionsPriceSum(product, sortedOptionIds);
+      const optionsPriceSum = calculateOptionsPriceSum(product, sortedOptionIds, bundleProds);
       const unitPrice = product.price + optionsPriceSum;
-      return [...prevCart, { product, quantity: 1, optionIds: sortedOptionIds, note, unitPrice }];
+      return [...prevCart, { product, quantity: 1, optionIds: sortedOptionIds, note, unitPrice, bundleSelectedProducts: bundleProds }];
     });
   };
 
@@ -357,7 +403,7 @@ const CustomerOrder = () => {
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   };
 
-  const buildStructuredSelectedOptions = (product, optionIds) => {
+  const buildStructuredSelectedOptions = (product, optionIds, bundleProds = selectedBundleProducts) => {
     if (!product || !product.modifierGroups || !optionIds || optionIds.length === 0) {
       return null;
     }
@@ -387,10 +433,17 @@ const CustomerOrder = () => {
                     }
                   });
                 }
-                selOptPayload.bundleItems.push({
+                
+                const biSelection = {
                   bundleItemId: bi.id,
                   optionIds: childOptionIds
-                });
+                };
+                
+                if (bi.targetCategoryId && bundleProds?.[bi.id]) {
+                  biSelection.selectedProductId = bundleProds[bi.id];
+                }
+                
+                selOptPayload.bundleItems.push(biSelection);
               });
             }
             
@@ -414,7 +467,7 @@ const CustomerOrder = () => {
         quantity: item.quantity,
         note: item.note || null,
         optionIds: item.optionIds || [],
-        selectedOptions: buildStructuredSelectedOptions(item.product, item.optionIds)
+        selectedOptions: buildStructuredSelectedOptions(item.product, item.optionIds, item.bundleSelectedProducts)
       }))
     };
 
@@ -650,7 +703,7 @@ const CustomerOrder = () => {
                       <h6 className="fw-bold text-dark mb-1">{item.product.name}</h6>
                       {item.optionIds && item.optionIds.length > 0 && (
                         <div className="text-muted mb-1" style={{ fontSize: '12px' }}>
-                          {getOptionNamesText(item.product, item.optionIds)}
+                          {getOptionNamesText(item.product, item.optionIds, item.bundleSelectedProducts)}
                         </div>
                       )}
                       <div className="d-flex gap-2 align-items-center">
@@ -804,6 +857,17 @@ const CustomerOrder = () => {
                               if (optionObj) {
                                 if (optionObj.bundleItems) {
                                   optionObj.bundleItems.forEach(bi => {
+                                    if (bi.targetCategoryId) {
+                                      const available = products.filter(p => p.categoryId === bi.targetCategoryId && p.status === 'AVAILABLE' && !p.isDeleted);
+                                      if (available.length > 0) {
+                                        setSelectedBundleProducts(prev => {
+                                          if (!prev[bi.id]) {
+                                            return { ...prev, [bi.id]: available[0].id };
+                                          }
+                                          return prev;
+                                        });
+                                      }
+                                    }
                                     if (bi.modifierGroups) {
                                       bi.modifierGroups.forEach(subG => {
                                         const subDefaults = [];
@@ -860,10 +924,42 @@ const CustomerOrder = () => {
                                       <div key={bi.id} className="bundle-item-section mb-3 p-3 rounded bg-light border">
                                         <div className="bundle-item-header fw-bold text-dark border-bottom pb-1.5 mb-2 d-flex align-items-center justify-content-between" style={{ fontSize: '13px' }}>
                                           <span><i className="bi bi-tag-fill text-secondary me-1.5"></i>{bi.name}</span>
-                                          {(!bi.modifierGroups || bi.modifierGroups.length === 0) && (
+                                          {(!bi.modifierGroups || bi.modifierGroups.length === 0) && !bi.targetCategoryId && (
                                             <span className="text-muted fw-normal" style={{ fontSize: '11px' }}>此品項無客製化調整</span>
                                           )}
                                         </div>
+                                        {bi.targetCategoryId && (
+                                          <div className="bundle-product-selector mb-3">
+                                            <div className="text-muted mb-2" style={{ fontSize: '12px' }}>
+                                              請選擇品項（超過 ${bi.baseAllowance} 需補差額）：
+                                            </div>
+                                            <div className="d-flex flex-wrap gap-2">
+                                              {products
+                                                .filter(p => p.categoryId === bi.targetCategoryId && p.status === 'AVAILABLE' && !p.isDeleted)
+                                                .map(p => {
+                                                  const diff = p.price - (bi.baseAllowance || 0);
+                                                  const isSelected = selectedBundleProducts[bi.id] === p.id;
+                                                  return (
+                                                    <button
+                                                      key={p.id}
+                                                      type="button"
+                                                      className={`btn btn-sm ${isSelected ? 'btn-primary' : 'btn-outline-secondary'}`}
+                                                      style={{ borderRadius: '20px', fontSize: '12px', padding: '6px 12px' }}
+                                                      onClick={() => {
+                                                        setSelectedBundleProducts(prev => ({
+                                                          ...prev,
+                                                          [bi.id]: p.id
+                                                        }));
+                                                      }}
+                                                    >
+                                                      {p.name}
+                                                      {diff > 0 && ` (+$${diff})`}
+                                                    </button>
+                                                  );
+                                                })}
+                                            </div>
+                                          </div>
+                                        )}
                                         {bi.modifierGroups && bi.modifierGroups.length > 0 ? (
                                           <div className="bundle-item-groups">
                                             {bi.modifierGroups.map(subGroup => renderModifierGroup(subGroup, depth + 1))}
@@ -892,7 +988,7 @@ const CustomerOrder = () => {
           </Modal.Body>
           <Modal.Footer className="border-0 pt-0 d-flex justify-content-between align-items-center">
             <span className="fw-bold text-primary" style={{ fontSize: '18px' }}>
-              ${selectedProduct ? selectedProduct.price + calculateOptionsPriceSum(selectedProduct, Object.values(selectedOptions).flat()) : 0}
+              ${selectedProduct ? selectedProduct.price + calculateOptionsPriceSum(selectedProduct, Object.values(selectedOptions).flat(), selectedBundleProducts) : 0}
             </span>
             <button 
               className="modern-btn px-4" 
@@ -909,9 +1005,29 @@ const CustomerOrder = () => {
                   alert('請檢查您的客製化選項是否符合選擇數量限制！');
                   return;
                 }
+
+                // 驗證自選套餐是否有選定商品
+                let bundleSelectValid = true;
+                activeGroups.forEach(group => {
+                  const selected = selectedOptions[group.id] || [];
+                  selected.forEach(optId => {
+                    const opt = group.options?.find(o => o.id === optId);
+                    if (opt && opt.bundleItems) {
+                      opt.bundleItems.forEach(bi => {
+                        if (bi.targetCategoryId && !selectedBundleProducts[bi.id]) {
+                          bundleSelectValid = false;
+                        }
+                      });
+                    }
+                  });
+                });
+                if (!bundleSelectValid) {
+                  alert('請為套餐的所有自選項目選擇一個商品！');
+                  return;
+                }
                 
                 const allSelectedOptionIds = Object.values(selectedOptions).flat();
-                addCustomizedToCart(selectedProduct, allSelectedOptionIds, '');
+                addCustomizedToCart(selectedProduct, allSelectedOptionIds, '', selectedBundleProducts);
                 setShowCustomModal(false);
               }}
             >

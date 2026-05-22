@@ -15,7 +15,9 @@ const ProductList = () => {
     price: '',
     description: '',
     imageUrl: '',
-    status: 'AVAILABLE'
+    status: 'AVAILABLE',
+    stock: 10,
+    stockAlertThreshold: 3
   });
 
   const fetchCategories = useCallback(async () => {
@@ -50,7 +52,16 @@ const ProductList = () => {
   const handleClose = () => {
     setShowModal(false);
     setEditingProduct(null);
-    setFormData({ name: '', categoryId: '', price: '', description: '', imageUrl: '', status: 'AVAILABLE' });
+    setFormData({ 
+      name: '', 
+      categoryId: '', 
+      price: '', 
+      description: '', 
+      imageUrl: '', 
+      status: 'AVAILABLE',
+      stock: 10,
+      stockAlertThreshold: 3
+    });
   };
 
   const handleShow = (product = null) => {
@@ -62,10 +73,21 @@ const ProductList = () => {
         price: product.price,
         description: product.description || '',
         imageUrl: product.imageUrl || '',
-        status: product.status
+        status: product.status,
+        stock: product.stock !== undefined && product.stock !== null ? product.stock : 10,
+        stockAlertThreshold: product.stockAlertThreshold !== undefined && product.stockAlertThreshold !== null ? product.stockAlertThreshold : 3
       });
     } else {
-      setFormData({ ...formData, categoryId: categories.length > 0 ? categories[0].id : '' });
+      setFormData({
+        name: '',
+        categoryId: categories.length > 0 ? categories[0].id : '',
+        price: '',
+        description: '',
+        imageUrl: '',
+        status: 'AVAILABLE',
+        stock: 10,
+        stockAlertThreshold: 3
+      });
     }
     setShowModal(true);
   };
@@ -151,6 +173,7 @@ const ProductList = () => {
             <th>商品名稱</th>
             <th>分類</th>
             <th>價格</th>
+            <th>庫存 / 預警</th>
             <th>狀態</th>
             <th className="text-end">操作</th>
           </tr>
@@ -169,6 +192,14 @@ const ProductList = () => {
               <td className="fw-semibold">{p.name}</td>
               <td>{getCategoryName(p.categoryId)}</td>
               <td>${p.price}</td>
+              <td>
+                <span className={p.stock <= p.stockAlertThreshold || p.status === 'SOLD_OUT' ? 'text-danger fw-bold' : 'fw-semibold'}>
+                  {p.stock !== undefined && p.stock !== null ? p.stock : 0}
+                </span>
+                <span className="text-muted" style={{ fontSize: '11px', marginLeft: '6px' }}>
+                  (門檻: {p.stockAlertThreshold !== undefined && p.stockAlertThreshold !== null ? p.stockAlertThreshold : 3})
+                </span>
+              </td>
               <td>{getStatusBadge(p.status)}</td>
               <td className="text-end">
                 <select 
@@ -228,6 +259,14 @@ const ProductList = () => {
                   <option value="SOLD_OUT">已售完</option>
                   <option value="HIDDEN">隱藏</option>
                 </select>
+              </div>
+              <div className="col-md-6 mb-3">
+                <Form.Label>目前庫存</Form.Label>
+                <input type="number" min="0" className="modern-input" value={formData.stock} onChange={e => setFormData({...formData, stock: parseInt(e.target.value) || 0})} required />
+              </div>
+              <div className="col-md-6 mb-3">
+                <Form.Label>庫存預警門檻</Form.Label>
+                <input type="number" min="0" className="modern-input" value={formData.stockAlertThreshold} onChange={e => setFormData({...formData, stockAlertThreshold: parseInt(e.target.value) || 0})} required />
               </div>
               <div className="col-12 mb-3">
                 <Form.Label>圖片網址 (URL)</Form.Label>

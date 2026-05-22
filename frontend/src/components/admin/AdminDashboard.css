@@ -1,0 +1,324 @@
+/* Dashboard Container & Header */
+.dashboard-container {
+  padding: 10px;
+  animation: dashboardFadeIn 0.5s ease;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #10b981;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 50px;
+}
+
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #10b981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulse 1.6s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+/* Metrics Cards */
+.metric-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  border-radius: 16px;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.metric-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+.metric-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  font-size: 24px;
+}
+
+.metric-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 4px;
+}
+
+.metric-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0;
+}
+
+/* Colors matching dark theme design system */
+.bg-indigo-light { background: rgba(99, 102, 241, 0.15); }
+.text-indigo { color: #818cf8; }
+
+.bg-teal-light { background: rgba(20, 184, 166, 0.15); }
+.text-teal { color: #2dd4bf; }
+
+.bg-amber-light { background: rgba(245, 158, 11, 0.15); }
+.text-amber { color: #fbbf24; }
+
+/* Donut Chart Styling */
+.chart-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-chart-container {
+  position: relative;
+  width: 180px;
+  height: 180px;
+}
+
+.donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  pointer-events: none;
+  width: 100px;
+}
+
+.donut-center-title {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 2px;
+}
+
+.donut-center-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.donut-center-subtitle {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.chart-legend {
+  width: 100%;
+}
+
+.legend-item {
+  transition: background-color 0.2s ease;
+  cursor: pointer;
+}
+
+.legend-item:hover, .legend-item.active-row {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.legend-badge {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-name {
+  font-size: 14px;
+  color: #fff;
+}
+
+.legend-value {
+  font-size: 14px;
+  color: #fff;
+}
+
+.legend-percent {
+  font-size: 12px;
+}
+
+/* Stock Alerts Badges */
+.alert-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 50px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badge-soldout {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.badge-lowstock {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+/* Floating Notification Toast */
+.toast-container-fixed {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 380px;
+  width: 100%;
+}
+
+.custom-toast {
+  position: relative;
+  background: rgba(25, 25, 35, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 16px;
+  color: #fff;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.toast-warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.toast-danger {
+  border-left: 4px solid #ef4444;
+}
+
+.toast-icon {
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.toast-warning .toast-icon { color: #f59e0b; }
+.toast-danger .toast-icon { color: #ef4444; }
+
+.toast-title {
+  font-size: 15px;
+  color: #fff;
+}
+
+.toast-message p {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.toast-close:hover {
+  color: #fff;
+}
+
+/* Toast Progress Bar */
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  animation: shrinkProgress 6s linear forwards;
+}
+
+.toast-warning .toast-progress {
+  background: #f59e0b;
+}
+
+.toast-danger .toast-progress {
+  background: #ef4444;
+}
+
+@keyframes shrinkProgress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+/* Animations */
+.slide-in {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes dashboardFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media(min-width: 768px) {
+  .chart-layout {
+    flex-direction: row;
+    gap: 40px;
+  }
+  .donut-chart-container {
+    width: 150px;
+    height: 150px;
+    flex-shrink: 0;
+  }
+  .chart-legend {
+    flex-grow: 1;
+  }
+}

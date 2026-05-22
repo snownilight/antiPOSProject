@@ -8,32 +8,32 @@ INSERT IGNORE INTO category (id, name, sort_order) VALUES (4, '停售分類 (測
 UPDATE category SET is_deleted = TRUE WHERE id = 4;
 
 -- Insert default products
-INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
-VALUES (1, 1, '招牌滷肉飯', '肥瘦相間，入口即化的美味', 50.00, 'https://images.unsplash.com/photo-1596522354195-e84ae3c98731?q=80&w=600&auto=format&fit=crop', 'AVAILABLE');
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, stock, stock_alert_threshold) 
+VALUES (1, 1, '招牌滷肉飯', '肥瘦相間，入口即化的美味', 50.00, 'https://images.unsplash.com/photo-1596522354195-e84ae3c98731?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', 15, 3);
 
-INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
-VALUES (2, 1, '香酥排骨飯', '現炸金黃大排骨，外酥內嫩', 90.00, 'https://images.unsplash.com/photo-1601362840469-51e4d8d58785?q=80&w=600&auto=format&fit=crop', 'AVAILABLE');
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, stock, stock_alert_threshold) 
+VALUES (2, 1, '香酥排骨飯', '現炸金黃大排骨，外酥內嫩', 90.00, 'https://images.unsplash.com/photo-1601362840469-51e4d8d58785?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', 8, 2);
 
-INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
-VALUES (3, 2, '燙青菜', '每日產地直送新鮮蔬菜', 40.00, 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?q=80&w=600&auto=format&fit=crop', 'AVAILABLE');
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, stock, stock_alert_threshold) 
+VALUES (3, 2, '燙青菜', '每日產地直送新鮮蔬菜', 40.00, 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', 20, 5);
 
-INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
-VALUES (4, 2, '滷蛋', '入味香Ｑ滷鴨蛋', 15.00, 'https://images.unsplash.com/photo-1627962491560-f4b679b380f2?q=80&w=600&auto=format&fit=crop', 'SOLD_OUT');
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, stock, stock_alert_threshold) 
+VALUES (4, 2, '滷蛋', '入味香Ｑ滷鴨蛋', 15.00, 'https://images.unsplash.com/photo-1627962491560-f4b679b380f2?q=80&w=600&auto=format&fit=crop', 'SOLD_OUT', 0, 2);
 
-INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
-VALUES (5, 3, '古早味紅茶', '微甜不膩的經典紅茶', 30.00, 'https://images.unsplash.com/photo-1576092762791-dd9e2220abd4?q=80&w=600&auto=format&fit=crop', 'AVAILABLE');
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, stock, stock_alert_threshold) 
+VALUES (5, 3, '古早味紅茶', '微甜不膩的經典紅茶', 30.00, 'https://images.unsplash.com/photo-1576092762791-dd9e2220abd4?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', 30, 4);
 
-INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, is_deleted) 
-VALUES (6, 3, '隱藏版特調', '已刪除的商品測試', 99.00, 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', TRUE);
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, is_deleted, stock, stock_alert_threshold) 
+VALUES (6, 3, '隱藏版特調', '已刪除的商品測試', 99.00, 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', TRUE, 10, 2);
 
-INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
-VALUES (10, 2, '黃金泡菜', '黃金比例醃製酸甜脆口', 25.00, 'https://images.unsplash.com/photo-1627962491560-f4b679b380f2?q=80&w=600&auto=format&fit=crop', 'AVAILABLE');
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, stock, stock_alert_threshold) 
+VALUES (10, 2, '黃金泡菜', '黃金比例醃製酸甜脆口', 25.00, 'https://images.unsplash.com/photo-1627962491560-f4b679b380f2?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', 25, 3);
 
-INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
-VALUES (11, 2, '皮蛋豆腐', '經典爽口涼拌菜', 35.00, 'https://images.unsplash.com/photo-1627962491560-f4b679b380f2?q=80&w=600&auto=format&fit=crop', 'AVAILABLE');
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, stock, stock_alert_threshold) 
+VALUES (11, 2, '皮蛋豆腐', '經典爽口涼拌菜', 35.00, 'https://images.unsplash.com/photo-1627962491560-f4b679b380f2?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', 12, 2);
 
-INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status) 
-VALUES (9, 3, '珍珠奶茶', '濃郁奶香與Q彈珍珠的完美結合', 50.00, 'https://images.unsplash.com/photo-1576092762791-dd9e2220abd4?q=80&w=600&auto=format&fit=crop', 'AVAILABLE');
+INSERT IGNORE INTO product (id, category_id, name, description, price, image_url, status, stock, stock_alert_threshold) 
+VALUES (9, 3, '珍珠奶茶', '濃郁奶香與Q彈珍珠的完美結合', 50.00, 'https://images.unsplash.com/photo-1576092762791-dd9e2220abd4?q=80&w=600&auto=format&fit=crop', 'AVAILABLE', 15, 3);
 
 -- Insert default dining tables
 INSERT IGNORE INTO dining_table (id, name, seats, status, token) VALUES (1, 'T1', 2, 'EMPTY', 'token-t1');

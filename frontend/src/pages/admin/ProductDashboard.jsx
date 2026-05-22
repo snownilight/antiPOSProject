@@ -23,6 +23,15 @@ const ProductDashboard = () => {
           AntiPOS
         </div>
         <nav className="nav-menu">
+          {hasRole(['ADMIN']) && (
+            <NavLink 
+              to="/admin/dashboard" 
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            >
+              <i className="bi bi-speedometer2"></i>
+              即時看板
+            </NavLink>
+          )}
           {hasRole(['ADMIN', 'WAITER']) && (
             <NavLink 
               to="/admin/tables" 

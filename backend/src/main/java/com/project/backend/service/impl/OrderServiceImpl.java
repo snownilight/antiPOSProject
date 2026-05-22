@@ -12,6 +12,8 @@ import com.project.backend.mapper.OrderMapper;
 import com.project.backend.service.DiningTableService;
 import com.project.backend.service.OrderService;
 import com.project.backend.service.ProductService;
+import com.project.backend.service.DashboardService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -34,6 +36,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class OrderServiceImpl implements OrderService {
 
@@ -45,6 +48,9 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     private DiningTableService diningTableService;
+
+    @Autowired
+    private DashboardService dashboardService;
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
@@ -620,6 +626,7 @@ public class OrderServiceImpl implements OrderService {
         if ("PAID".equals(upperStatus)) {
             // 付款成功連動更新桌台為 CLEANING (清潔中)
             diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
+            processPaymentSuccess(order);
         } else if ("CANCELLED".equals(upperStatus)) {
             // 取消訂單時，如果桌台沒有其他活動中訂單，則連動更新桌台為 EMPTY (空閒)
             List<Order> activeOrders = orderMapper.findAllActiveByStatuses(order.getTableId(), BILLABLE_ORDER_STATUSES);
@@ -662,12 +669,49 @@ public class OrderServiceImpl implements OrderService {
         // 3. 桌台狀態連動邏輯
         diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
 
+        processPaymentSuccess(order);
+
         Order checkedOutOrder = getOrderById(id);
 
         // 4. 廣播 WebSocket 事件 (POS-33)
         broadcastOrderEvent("ORDER_STATUS_CHANGED", checkedOutOrder);
 
         return checkedOutOrder;
+    }
+
+    private void processPaymentSuccess(Order order) {
+        try {
+            List<OrderItem> items = orderMapper.findItemsByOrderId(order.getId());
+            if (items != null) {
+                for (OrderItem item : items) {
+                    Product product = productService.getProductById(item.getProductId());
+                    if (product != null) {
+                        int currentStock = product.getStock() != null ? product.getStock() : 0;
+                        int quantity = item.getQuantity();
+                        int newStock = Math.max(0, currentStock - quantity);
+                        product.setStock(newStock);
+                        
+                        // If stock drops to 0, mark as SOLD_OUT
+                        if (newStock == 0) {
+                            product.setStatus("SOLD_OUT");
+                        }
+                        
+                        productService.updateProduct(product.getId(), product);
+                        
+                        // Check alert threshold
+                        int threshold = product.getStockAlertThreshold() != null ? product.getStockAlertThreshold() : 0;
+                        if (newStock <= threshold || "SOLD_OUT".equalsIgnoreCase(product.getStatus())) {
+                            dashboardService.broadcastStockAlert(product);
+                        }
+                    }
+                }
+            }
+            // Broadcast dashboard updates
+            dashboardService.broadcastDashboardUpdate();
+        } catch (Exception e) {
+            // Log exceptions but do not crash the order transaction
+            log.error("Failed to process payment success side effects: ", e);
+        }
     }
 
     @Override

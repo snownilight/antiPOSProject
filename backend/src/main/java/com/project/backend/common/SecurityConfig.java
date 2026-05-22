@@ -76,6 +76,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH, "/api/orders/*/status").hasAnyRole("ADMIN", "WAITER", "KITCHEN")
                 .requestMatchers(HttpMethod.DELETE, "/api/orders/**").hasRole("ADMIN")
 
+                // Dashboard
+                .requestMatchers("/api/dashboard/**").hasRole("ADMIN")
+
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

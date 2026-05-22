@@ -11,6 +11,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Login from './pages/Login'
 import Forbidden from './pages/Forbidden'
+import AdminDashboard from './components/admin/AdminDashboard'
 
 const HomeRedirect = () => {
   const { user } = useAuth();
@@ -19,6 +20,9 @@ const HomeRedirect = () => {
   }
   if (user.role === 'KITCHEN') {
     return <Navigate to="/admin/kitchen" replace />;
+  }
+  if (user.role === 'ADMIN') {
+    return <Navigate to="/admin/dashboard" replace />;
   }
   return <Navigate to="/admin/tables" replace />;
 };
@@ -40,6 +44,14 @@ function App() {
             </ProtectedRoute>
           }
         >
+          <Route 
+            path="dashboard" 
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } 
+          />
           <Route 
             path="products" 
             element={

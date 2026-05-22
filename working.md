@@ -66,6 +66,23 @@
 
 ## 2. 已完成的工單與變更
 
+### 2026-05-22 | [Jira: POS-55] 管理員即時營收與庫存數據看板 (Dashboard)
+- **資料庫欄位設計與測試資料初始化**：
+  - 修改 `schema.sql` 增加商品庫存 `stock` 與預警門檻 `stock_alert_threshold` 欄位。
+  - 修改 `data.sql` 初始化預設庫存與警報數值。
+- **後端實體與 MyBatis 映射**：
+  - 更新 `Product.java` 屬性並在 `ProductMapper.xml` 映射新增庫存欄位，調整 `insert` 與 `update` SQL。
+- **即時看板數據 API 與 WebSocket 廣播**：
+  - 建立 `DashboardDataDTO.java` 數據格式，並實作 `DashboardMapper.xml` 統計當日營業額、已付款訂單數、客單價、Top 5 熱銷品項與庫存警告清單。
+  - 實作 `DashboardServiceImpl.java` 利用台北時間進行數據運算與 WebSocket `/topic/dashboard` 廣播。
+  - 開發 `DashboardController.java` 提供 `/api/dashboard/today` 端點，並在 `SecurityConfig.java` 限制為 `ADMIN` 角色存取。
+- **庫存扣減、警報與即時看板連動**：
+  - 修改 `OrderServiceImpl.java`，在訂單變更為 `PAID` 時扣減商品庫存，檢測低庫存與售罄狀態，觸發 `STOCK_ALERT` 即時警報並發送最新看板數據。
+  - 修改 `ProductServiceImpl.java`，在管理員手動調整庫存或變更售罄狀態時，觸發即時同步。
+- **前端即時看板 UI/UX (Premium Design)**：
+  - 創建 `AdminDashboard.jsx` 看板頁面，以磨砂玻璃風格 (Glassmorphism) 設計今日營業額、付款訂單數與客單價卡片，並運用原生 SVG 實現具懸浮互動的甜甜圈熱銷品項圖表。
+  - 實作即時 Toast 提示與庫存警報清單連動，在 App.jsx 註冊 `/admin/dashboard` 路由並設定 `ADMIN` 自動跳轉。
+
 ### 📅 2026-05-22 | [Jira: POS-54] 系統權限控管與安全機制 (RBAC & JWT)
 - **後端安全基礎建設與 JWT 整合**：
   - 引入 `spring-boot-starter-security` 與 `jjwt` 進行無狀態身分驗證。
@@ -83,7 +100,7 @@
   - 新增 `JwtTokenProviderTest.java` 進行 Token 安全校驗。
   - `.\mvnw test` 通過所有安全及業務邏輯測試，`npm run lint` 完全無警告，`npm run build` 打包順暢。
 
-### 📅 2026-05-22 | [Jira: POS-48] 結構化商品客製化選項與加價系統 (含套餐二次客製化)��時顯示準備中訂單，並可一鍵流轉製作狀態。
+### 📅 2026-05-22 | [Jira: POS-48] 結構化商品客製化選項與加價系統 (含套餐二次客製化)��時顯示準備中訂單，並可一鍵流轉製作狀態。
   - 顧客自助點餐頁 (`/order?token=...`)：顧客 RWD 點餐，包含購物車 Drawer 與 WebSocket 狀態即時更新監聽。
 
 ### 🧪 測試與驗證資源

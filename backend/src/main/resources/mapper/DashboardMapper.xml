@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.project.backend.mapper.DashboardMapper">
+
+    <select id="getTodayRevenue" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(total_amount), 0.00)
+        FROM orders
+        WHERE status = 'PAID' AND is_deleted = FALSE
+          AND created_at &gt;= #{startTime} AND created_at &lt;= #{endTime}
+    </select>
+
+    <select id="getTodayPaidOrderCount" resultType="int">
+        SELECT COUNT(*)
+        FROM orders
+        WHERE status = 'PAID' AND is_deleted = FALSE
+          AND created_at &gt;= #{startTime} AND created_at &lt;= #{endTime}
+    </select>
+
+    <select id="getTodayTopProducts" resultType="com.project.backend.dto.DashboardDataDTO$ProductSalesDTO">
+        SELECT 
+            oi.product_id AS productId, 
+            MAX(oi.product_name) AS productName, 
+            CAST(SUM(oi.quantity) AS SIGNED) AS quantitySold
+        FROM order_item oi
+        JOIN orders o ON oi.order_id = o.id
+        WHERE o.status = 'PAID' AND o.is_deleted = FALSE
+          AND o.created_at &gt;= #{startTime} AND o.created_at &lt;= #{endTime}
+        GROUP BY oi.product_id
+        ORDER BY quantitySold DESC, productId ASC
+        LIMIT 5
+    </select>
+
+    <select id="getStockAlerts" resultType="com.project.backend.dto.DashboardDataDTO$ProductStockAlertDTO">
+        SELECT 
+            id AS productId, 
+            name AS productName, 
+            stock, 
+            stock_alert_threshold AS stockAlertThreshold, 
+            status
+        FROM product
+        WHERE is_deleted = FALSE 
+          AND (stock &lt;= stock_alert_threshold OR status = 'SOLD_OUT')
+        ORDER BY 
+          CASE WHEN status = 'SOLD_OUT' THEN 1 ELSE 2 END,
+          stock ASC, 
+          id ASC
+    </select>
+
+</mapper>

@@ -11,6 +11,8 @@
         <result property="price" column="price" />
         <result property="imageUrl" column="image_url" />
         <result property="status" column="status" />
+        <result property="stock" column="stock" />
+        <result property="stockAlertThreshold" column="stock_alert_threshold" />
         <result property="isDeleted" column="is_deleted" />
         <result property="createdAt" column="created_at" />
         <result property="updatedAt" column="updated_at" />
@@ -98,8 +100,8 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO product (category_id, name, description, price, image_url, status)
-        VALUES (#{categoryId}, #{name}, #{description}, #{price}, #{imageUrl}, #{status})
+        INSERT INTO product (category_id, name, description, price, image_url, status, stock, stock_alert_threshold)
+        VALUES (#{categoryId}, #{name}, #{description}, #{price}, #{imageUrl}, #{status}, #{stock}, #{stockAlertThreshold})
     </insert>
 
     <update id="update">
@@ -111,6 +113,8 @@
             <if test="price != null">price = #{price},</if>
             <if test="imageUrl != null">image_url = #{imageUrl},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="stock != null">stock = #{stock},</if>
+            <if test="stockAlertThreshold != null">stock_alert_threshold = #{stockAlertThreshold},</if>
         </set>
         WHERE id = #{id} AND is_deleted = FALSE
     </update>

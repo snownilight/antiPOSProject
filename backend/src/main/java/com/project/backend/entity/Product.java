@@ -29,6 +29,8 @@ public class Product {
     private String imageUrl;
 
     private String status; // AVAILABLE, SOLD_OUT, HIDDEN
+    private Integer stock;
+    private Integer stockAlertThreshold;
     private Boolean isDeleted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS product (
     price DECIMAL(10, 2) NOT NULL,
     image_url VARCHAR(1000),
     status VARCHAR(50) DEFAULT 'AVAILABLE', -- AVAILABLE, SOLD_OUT, HIDDEN
+    stock INT DEFAULT 10,
+    stock_alert_threshold INT DEFAULT 3,
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_category FOREIGN KEY (category_id) REFERENCES category(id)
@@ -171,6 +173,8 @@ ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS bundle_item_id BIGINT NUL
 ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS bundle_item_name VARCHAR(255) NULL;
 ALTER TABLE bundle_item ADD COLUMN IF NOT EXISTS target_category_id BIGINT NULL;
 ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS selected_product_id BIGINT NULL;
+ALTER TABLE product ADD COLUMN IF NOT EXISTS stock INT DEFAULT 10;
+ALTER TABLE product ADD COLUMN IF NOT EXISTS stock_alert_threshold INT DEFAULT 3;
 
 -- Users Table (POS-54)
 CREATE TABLE IF NOT EXISTS users (

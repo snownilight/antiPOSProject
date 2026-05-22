@@ -8,11 +8,16 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+import com.project.backend.service.DashboardService;
+
 @Service
 public class ProductServiceImpl implements ProductService {
 
     @Autowired
     private ProductMapper productMapper;
+
+    @Autowired
+    private DashboardService dashboardService;
 
     @Override
     public List<Product> getAllActiveProducts(Long categoryId) {
@@ -34,7 +39,10 @@ public class ProductServiceImpl implements ProductService {
             product.setStatus("AVAILABLE");
         }
         productMapper.insert(product);
-        return productMapper.findById(product.getId());
+        
+        Product createdProduct = productMapper.findById(product.getId());
+        checkAndBroadcastProductUpdate(createdProduct);
+        return createdProduct;
     }
 
     @Override
@@ -42,18 +50,35 @@ public class ProductServiceImpl implements ProductService {
         getProductById(id);
         product.setId(id);
         productMapper.update(product);
-        return productMapper.findById(id);
+        Product updatedProduct = productMapper.findById(id);
+        checkAndBroadcastProductUpdate(updatedProduct);
+        return updatedProduct;
     }
 
     @Override
     public void deleteProduct(Long id) {
         getProductById(id);
         productMapper.softDelete(id);
+        // Deleting a product should also update the dashboard alerts list
+        dashboardService.broadcastDashboardUpdate();
     }
 
     @Override
     public void updateProductStatus(Long id, String status) {
         getProductById(id);
         productMapper.updateStatus(id, status);
+        Product updatedProduct = productMapper.findById(id);
+        checkAndBroadcastProductUpdate(updatedProduct);
+    }
+
+    private void checkAndBroadcastProductUpdate(Product product) {
+        if (product != null) {
+            int stock = product.getStock() != null ? product.getStock() : 0;
+            int threshold = product.getStockAlertThreshold() != null ? product.getStockAlertThreshold() : 0;
+            if (stock <= threshold || "SOLD_OUT".equalsIgnoreCase(product.getStatus())) {
+                dashboardService.broadcastStockAlert(product);
+            }
+            dashboardService.broadcastDashboardUpdate();
+        }
     }
 }

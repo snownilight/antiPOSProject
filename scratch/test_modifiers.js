@@ -277,8 +277,8 @@ async function runTests() {
 
     const sItem = sOrder.items[0];
     console.log(`Options Count: ${sItem.options?.length}`);
-    if (!sItem.options || sItem.options.length !== 3) {
-      throw new Error(`Expected 3 options for structured set meal order item, got ${sItem.options?.length}`);
+    if (!sItem.options || sItem.options.length !== 5) {
+      throw new Error(`Expected 5 options for structured set meal order item, got ${sItem.options?.length}`);
     }
 
     const parentOpt = sItem.options.find(o => o.optionId === 13);

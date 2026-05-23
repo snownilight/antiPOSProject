@@ -1,4 +1,5 @@
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS order_payment;
 DROP TABLE IF EXISTS order_item_option;
 DROP TABLE IF EXISTS bundle_item_modifier_group;
 DROP TABLE IF EXISTS bundle_item;
@@ -59,6 +60,9 @@ CREATE TABLE IF NOT EXISTS orders (
     order_no VARCHAR(50) NOT NULL UNIQUE,
     total_amount DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     status VARCHAR(50) DEFAULT 'PENDING', -- PENDING, PREPARING, READY, PAID, CANCELLED
+    invoice_no VARCHAR(50) DEFAULT NULL,
+    carrier_no VARCHAR(50) DEFAULT NULL,
+    love_code VARCHAR(50) DEFAULT NULL,
     is_deleted BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -79,6 +83,16 @@ CREATE TABLE IF NOT EXISTS order_item (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_item_order FOREIGN KEY (order_id) REFERENCES orders(id),
     CONSTRAINT fk_item_product FOREIGN KEY (product_id) REFERENCES product(id)
+);
+
+-- Order Payment Table
+CREATE TABLE IF NOT EXISTS order_payment (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT NOT NULL,
+    payment_method VARCHAR(50) NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_payment_order FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
 -- For compatibility with existing databases, dynamically add token column and populate it if needed
@@ -177,6 +191,9 @@ ALTER TABLE bundle_item ADD COLUMN IF NOT EXISTS target_category_id BIGINT NULL;
 ALTER TABLE order_item_option ADD COLUMN IF NOT EXISTS selected_product_id BIGINT NULL;
 ALTER TABLE product ADD COLUMN IF NOT EXISTS stock INT DEFAULT 10;
 ALTER TABLE product ADD COLUMN IF NOT EXISTS stock_alert_threshold INT DEFAULT 3;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS invoice_no VARCHAR(50) DEFAULT NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS carrier_no VARCHAR(50) DEFAULT NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS love_code VARCHAR(50) DEFAULT NULL;
 
 -- Users Table (POS-54)
 CREATE TABLE IF NOT EXISTS users (

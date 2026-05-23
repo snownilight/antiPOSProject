@@ -9,12 +9,16 @@
         <result property="orderNo" column="order_no" />
         <result property="totalAmount" column="total_amount" />
         <result property="status" column="status" />
+        <result property="invoiceNo" column="invoice_no" />
+        <result property="carrierNo" column="carrier_no" />
+        <result property="loveCode" column="love_code" />
         <result property="isDeleted" column="is_deleted" />
         <result property="createdAt" column="created_at" />
         <result property="updatedAt" column="updated_at" />
         <result property="tableName" column="table_name" />
         
         <collection property="items" ofType="com.project.backend.entity.OrderItem" resultMap="orderItemResultMap" columnPrefix="item_" />
+        <collection property="payments" ofType="com.project.backend.entity.OrderPayment" select="findPaymentsByOrderId" column="id" />
     </resultMap>
 
     <resultMap id="orderItemResultMap" type="com.project.backend.entity.OrderItem">
@@ -33,7 +37,7 @@
 
     <select id="findById" resultMap="orderResultMap">
         SELECT 
-            o.id, o.table_id, o.order_no, o.total_amount, o.status, o.is_deleted, o.created_at, o.updated_at,
+            o.id, o.table_id, o.order_no, o.total_amount, o.status, o.invoice_no, o.carrier_no, o.love_code, o.is_deleted, o.created_at, o.updated_at,
             t.name AS table_name,
             oi.id AS item_id, oi.order_id AS item_order_id, oi.product_id AS item_product_id, 
             oi.product_name AS item_product_name, oi.price AS item_price, oi.quantity AS item_quantity, 
@@ -46,7 +50,7 @@
 
     <select id="findByOrderNo" resultMap="orderResultMap">
         SELECT 
-            o.id, o.table_id, o.order_no, o.total_amount, o.status, o.is_deleted, o.created_at, o.updated_at,
+            o.id, o.table_id, o.order_no, o.total_amount, o.status, o.invoice_no, o.carrier_no, o.love_code, o.is_deleted, o.created_at, o.updated_at,
             t.name AS table_name,
             oi.id AS item_id, oi.order_id AS item_order_id, oi.product_id AS item_product_id, 
             oi.product_name AS item_product_name, oi.price AS item_price, oi.quantity AS item_quantity, 
@@ -59,7 +63,7 @@
 
     <select id="findAllActive" resultMap="orderResultMap">
         SELECT 
-            o.id, o.table_id, o.order_no, o.total_amount, o.status, o.is_deleted, o.created_at, o.updated_at,
+            o.id, o.table_id, o.order_no, o.total_amount, o.status, o.invoice_no, o.carrier_no, o.love_code, o.is_deleted, o.created_at, o.updated_at,
             t.name AS table_name,
             oi.id AS item_id, oi.order_id AS item_order_id, oi.product_id AS item_product_id, 
             oi.product_name AS item_product_name, oi.price AS item_price, oi.quantity AS item_quantity, 
@@ -79,7 +83,7 @@
 
     <select id="findAllActiveByStatuses" resultMap="orderResultMap">
         SELECT
-            o.id, o.table_id, o.order_no, o.total_amount, o.status, o.is_deleted, o.created_at, o.updated_at,
+            o.id, o.table_id, o.order_no, o.total_amount, o.status, o.invoice_no, o.carrier_no, o.love_code, o.is_deleted, o.created_at, o.updated_at,
             t.name AS table_name,
             oi.id AS item_id, oi.order_id AS item_order_id, oi.product_id AS item_product_id,
             oi.product_name AS item_product_name, oi.price AS item_price, oi.quantity AS item_quantity,
@@ -101,8 +105,8 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO orders (table_id, order_no, total_amount, status)
-        VALUES (#{tableId}, #{orderNo}, #{totalAmount}, #{status})
+        INSERT INTO orders (table_id, order_no, total_amount, status, invoice_no, carrier_no, love_code)
+        VALUES (#{tableId}, #{orderNo}, #{totalAmount}, #{status}, #{invoiceNo}, #{carrierNo}, #{loveCode})
     </insert>
 
     <update id="update">
@@ -112,6 +116,9 @@
             <if test="orderNo != null">order_no = #{orderNo},</if>
             <if test="totalAmount != null">total_amount = #{totalAmount},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="invoiceNo != null">invoice_no = #{invoiceNo},</if>
+            <if test="carrierNo != null">carrier_no = #{carrierNo},</if>
+            <if test="loveCode != null">love_code = #{loveCode},</if>
         </set>
         WHERE id = #{id} AND is_deleted = FALSE
     </update>
@@ -142,6 +149,19 @@
             parent_id AS parentId, bundle_item_id AS bundleItemId, bundle_item_name AS bundleItemName, selected_product_id AS selectedProductId, created_at AS createdAt 
         FROM order_item_option 
         WHERE order_item_id = #{orderItemId} 
+        ORDER BY id ASC
+    </select>
+
+    <insert id="insertOrderPayment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO order_payment (order_id, payment_method, amount)
+        VALUES (#{orderId}, #{paymentMethod}, #{amount})
+    </insert>
+
+    <select id="findPaymentsByOrderId" resultType="com.project.backend.entity.OrderPayment">
+        SELECT 
+            id, order_id AS orderId, payment_method AS paymentMethod, amount, created_at AS createdAt
+        FROM order_payment
+        WHERE order_id = #{orderId}
         ORDER BY id ASC
     </select>
 

@@ -3,6 +3,7 @@ package com.project.backend.mapper;
 import com.project.backend.entity.Order;
 import com.project.backend.entity.OrderItem;
 import com.project.backend.entity.OrderItemOption;
+import com.project.backend.entity.OrderPayment;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -32,4 +33,9 @@ public interface OrderMapper {
     int insertOrderItemOption(OrderItemOption option);
     
     List<OrderItemOption> findOptionsByOrderItemId(Long orderItemId);
+
+    // Order Payment operations (POS-56)
+    int insertOrderPayment(OrderPayment payment);
+    
+    List<OrderPayment> findPaymentsByOrderId(Long orderId);
 }

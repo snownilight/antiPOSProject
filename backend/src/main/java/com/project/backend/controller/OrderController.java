@@ -2,6 +2,7 @@ package com.project.backend.controller;
 
 import com.project.backend.common.ApiResponse;
 import com.project.backend.dto.OrderCreateRequest;
+import com.project.backend.dto.CheckoutRequest;
 import com.project.backend.entity.Order;
 import com.project.backend.service.OrderService;
 import jakarta.validation.Valid;
@@ -75,8 +76,10 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/checkout")
-    public ApiResponse<Order> checkoutOrder(@PathVariable Long id) {
-        Order checkedOutOrder = orderService.checkoutOrder(id);
+    public ApiResponse<Order> checkoutOrder(
+            @PathVariable Long id,
+            @RequestBody(required = false) CheckoutRequest request) {
+        Order checkedOutOrder = orderService.checkoutOrder(id, request);
         return ApiResponse.success("Order checked out successfully", checkedOutOrder);
     }
 

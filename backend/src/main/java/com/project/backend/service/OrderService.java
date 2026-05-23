@@ -1,6 +1,7 @@
 package com.project.backend.service;
 
 import com.project.backend.dto.OrderCreateRequest;
+import com.project.backend.dto.CheckoutRequest;
 import com.project.backend.entity.Order;
 import java.util.List;
 
@@ -12,6 +13,6 @@ public interface OrderService {
     List<Order> getAllActiveOrders(Long tableId, List<String> statuses);
     List<Order> getKitchenOrders();
     Order updateOrderStatus(Long id, String status);
-    Order checkoutOrder(Long id);
+    Order checkoutOrder(Long id, CheckoutRequest request);
     void deleteOrder(Long id);
 }

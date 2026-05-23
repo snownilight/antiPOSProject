@@ -20,11 +20,13 @@ if (!email || !token || !domain) {
   process.exit(1);
 }
 
+const ticketKey = process.argv[2] || 'POS-54';
+
 const auth = Buffer.from(`${email}:${token}`).toString('base64');
 
 const options = {
   hostname: domain,
-  path: '/rest/api/3/issue/POS-54',
+  path: `/rest/api/3/issue/${ticketKey}`,
   method: 'GET',
   headers: {
     'Authorization': `Basic ${auth}`,
@@ -41,8 +43,8 @@ const req = https.request(options, (res) => {
 
   res.on('end', () => {
     if (res.statusCode === 200) {
-      fs.writeFileSync('scratch/POS-54.json', data);
-      console.log('Successfully fetched Jira ticket POS-54 and saved to scratch/POS-54.json');
+      fs.writeFileSync(`scratch/${ticketKey}.json`, data);
+      console.log(`Successfully fetched Jira ticket ${ticketKey} and saved to scratch/${ticketKey}.json`);
       
       const ticket = JSON.parse(data);
       console.log('--- Ticket Summary ---');

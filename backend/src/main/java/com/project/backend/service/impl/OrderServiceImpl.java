@@ -3,16 +3,19 @@ package com.project.backend.service.impl;
 import com.project.backend.dto.OrderCreateRequest;
 import com.project.backend.dto.OrderEventDTO;
 import com.project.backend.dto.OrderItemCreateRequest;
+import com.project.backend.dto.CheckoutRequest;
 import com.project.backend.entity.DiningTable;
 import com.project.backend.entity.Order;
 import com.project.backend.entity.OrderItem;
 import com.project.backend.entity.OrderItemOption;
+import com.project.backend.entity.OrderPayment;
 import com.project.backend.entity.Product;
 import com.project.backend.mapper.OrderMapper;
 import com.project.backend.service.DiningTableService;
 import com.project.backend.service.OrderService;
 import com.project.backend.service.ProductService;
 import com.project.backend.service.DashboardService;
+import com.project.backend.service.InvoiceService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,6 +57,9 @@ public class OrderServiceImpl implements OrderService {
 
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
+
+    @Autowired
+    private InvoiceService invoiceService;
 
     @Value("${order.require-staff-confirm:false}")
     private boolean requireStaffConfirm;
@@ -643,8 +649,13 @@ public class OrderServiceImpl implements OrderService {
 
         // 7. 桌台狀態連動邏輯
         if ("PAID".equals(upperStatus)) {
-            // 付款成功連動更新桌台為 CLEANING (清潔中)
-            diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
+            // 付款成功連動更新桌台：如果沒有其他活動中訂單，則更新為 CLEANING (清潔中)
+            List<Order> activeOrders = orderMapper.findAllActiveByStatuses(order.getTableId(), BILLABLE_ORDER_STATUSES);
+            boolean hasOtherActive = activeOrders.stream()
+                    .anyMatch(o -> !o.getId().equals(order.getId()));
+            if (!hasOtherActive) {
+                diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
+            }
             processPaymentSuccess(order);
         } else if ("CANCELLED".equals(upperStatus)) {
             // 取消訂單時，如果桌台沒有其他活動中訂單，則連動更新桌台為 EMPTY (空閒)
@@ -673,7 +684,7 @@ public class OrderServiceImpl implements OrderService {
     
     @Override
     @Transactional
-    public Order checkoutOrder(Long id) {
+    public Order checkoutOrder(Long id, CheckoutRequest request) {
         Order order = getOrderById(id);
         
         if ("PAID".equals(order.getStatus()) || "CANCELLED".equals(order.getStatus())) {
@@ -688,18 +699,83 @@ public class OrderServiceImpl implements OrderService {
         }
         order.setTotalAmount(totalAmount);
         
-        // 2. 更新狀態為 PAID
+        // 2. 驗證手機載具與愛心碼
+        String carrierNo = null;
+        String loveCode = null;
+        if (request != null) {
+            carrierNo = request.getCarrierNo();
+            loveCode = request.getLoveCode();
+            
+            if (carrierNo != null && !carrierNo.trim().isEmpty() && loveCode != null && !loveCode.trim().isEmpty()) {
+                throw new IllegalArgumentException("手機載具與愛心碼不可同時使用");
+            }
+            
+            if (carrierNo != null && !carrierNo.trim().isEmpty()) {
+                invoiceService.validateCarrierNo(carrierNo);
+            }
+            if (loveCode != null && !loveCode.trim().isEmpty()) {
+                invoiceService.validateLoveCode(loveCode);
+            }
+        }
+
+        // 3. 處理支付明細
+        List<OrderPayment> paymentsToSave = new ArrayList<>();
+        if (request == null || request.getPayments() == null || request.getPayments().isEmpty()) {
+            // 預設為全額現金支付（以維持向下相容性）
+            paymentsToSave.add(OrderPayment.builder()
+                    .orderId(id)
+                    .paymentMethod("CASH")
+                    .amount(totalAmount)
+                    .build());
+        } else {
+            BigDecimal paymentSum = BigDecimal.ZERO;
+            for (CheckoutRequest.PaymentRequest payReq : request.getPayments()) {
+                if (payReq.getAmount() == null || payReq.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new IllegalArgumentException("支付金額必須大於 0");
+                }
+                if (payReq.getPaymentMethod() == null || payReq.getPaymentMethod().trim().isEmpty()) {
+                    throw new IllegalArgumentException("支付方式不能為空");
+                }
+                paymentSum = paymentSum.add(payReq.getAmount());
+                paymentsToSave.add(OrderPayment.builder()
+                        .orderId(id)
+                        .paymentMethod(payReq.getPaymentMethod().trim().toUpperCase())
+                        .amount(payReq.getAmount())
+                        .build());
+            }
+            
+            if (paymentSum.compareTo(totalAmount) != 0) {
+                throw new IllegalArgumentException("支付金額總和 (" + paymentSum + ") 必須等於訂單總金額 (" + totalAmount + ")");
+            }
+        }
+
+        // 4. 生成模擬發票號碼
+        String invoiceNo = invoiceService.generateInvoiceNo();
+        order.setInvoiceNo(invoiceNo);
+        order.setCarrierNo(carrierNo != null && !carrierNo.trim().isEmpty() ? carrierNo.trim() : null);
+        order.setLoveCode(loveCode != null && !loveCode.trim().isEmpty() ? loveCode.trim() : null);
+
+        // 5. 寫入支付明細與更新訂單狀態為 PAID
         order.setStatus("PAID");
         orderMapper.update(order);
         
-        // 3. 桌台狀態連動邏輯
-        diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
+        for (OrderPayment payment : paymentsToSave) {
+            orderMapper.insertOrderPayment(payment);
+        }
+        
+        // 6. 桌台狀態連動邏輯
+        List<Order> activeOrders = orderMapper.findAllActiveByStatuses(order.getTableId(), BILLABLE_ORDER_STATUSES);
+        boolean hasOtherActive = activeOrders.stream()
+                .anyMatch(o -> !o.getId().equals(order.getId()));
+        if (!hasOtherActive) {
+            diningTableService.updateTableStatus(order.getTableId(), "CLEANING");
+        }
 
         processPaymentSuccess(order);
 
         Order checkedOutOrder = getOrderById(id);
 
-        // 4. 廣播 WebSocket 事件 (POS-33)
+        // 7. 廣播 WebSocket 事件 (POS-33)
         broadcastOrderEvent("ORDER_STATUS_CHANGED", checkedOutOrder);
 
         return checkedOutOrder;

@@ -10,232 +10,86 @@
 ## 1. 目前架構/功能現況
 
 ### 📌 環境設定與連線資訊
-- **資料庫**：採用本地 **MariaDB**。
-  - 連線網址：`jdbc:mysql://localhost:3306/antipos` (帳密 `root`/`root`)。
-  - 初始化：透過具有 `IF NOT EXISTS` 與 `INSERT IGNORE` 防重複載入設計的 `schema.sql` 與 `data.sql` 進行。
-- **跨域 CORS 設定**：
-  - 後端集中至 [WebMvcConfig.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/common/WebMvcConfig.java) 進行配置。
-  - 環境變數檔 [frontend/.env](file:///d:/Learing/project/antiPOSProject/frontend/.env) 定義 `VITE_API_BASE_URL=http://localhost:8081/api`。
-  - 統一於 [api.js](file:///d:/Learing/project/antiPOSProject/frontend/src/utils/api.js) 中導出 `API_BASE_URL`。
+- **資料庫**：採用本地 MariaDB (`jdbc:mysql://localhost:3306/antipos`，帳密 `root`/`root`)，透過 `schema.sql` 與 `data.sql` 自動初始化。
+- **跨域設定**：後端統一配置 CORS，前端定義 API 網址並透過 axios/fetch 介接。
 
 ### 💻 後端架構
 - **開發環境**：Spring Boot 3.2.5 + MyBatis + Lombok + Java 21。
-- **安全與權限控制 (RBAC & JWT)**：
-  - 整合 Spring Security 與無狀態 JWT 驗證。
-  - 支持店員角色（`ADMIN`、`WAITER`、`KITCHEN`）與顧客角色（`CUSTOMER`）之安全認證與存取。
-  - 透過全域過濾器 `JwtAuthenticationFilter` 解析 `Bearer` Token，並在安全配置中為 `/error` 路徑配置 `permitAll()` 防止二次權限阻擋衝突。
-- **異常與錯誤處理**：
-  - 採用 `GlobalExceptionHandler` 搭配統一格式的 `ApiResponse`。
-  - 服務層 (Service) 例外已收斂為 mapping-compatible exceptions (如 `IllegalArgumentException`)，拋出時會自動轉化為 `400 Bad Request`，保障 API 的防護與穩定度。
-- **系統健康狀態與診斷**：
-  - 新增 [HealthCheckController.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/controller/HealthCheckController.java) 及 `/api/v1/health` 公開端點，提供系統連線診斷及 GlobalExceptionHandler 對 `IllegalArgumentException` 轉 400 錯誤之驗證工具。
-- **即時通訊服務**：
-  - 整合 `spring-boot-starter-websocket` 與 STOMP over SockJS。
-  - 廣播主題包含為廚房與外場桌台設計的 `/topic/orders` (傳遞 `OrderEventDTO` 與 `TableStatusEvent` 事件載荷)，以及專供看板即時更新的 `/topic/dashboard`。
-- **訂單編號生成**：
-  - 採用 15 碼格式 `TW-YYMMDD-XXXXX`（台北時區 UTC+8，後五碼排除混淆字元 `I`, `O`, `L`, `U`），並採用 `ThreadLocalRandom` 優化高併發效能。
-- **複合式結帳與模擬電子發票**：
-  - 支援一張訂單有多筆支付方式紀錄（現金、LINE Pay、信用卡、悠遊卡等），支付金額總和必須等於訂單總金額。
-  - 整合手機載具（`^\/[A-Z0-9.+-]{7}$`）與愛心碼（`^[0-9]{3,7}$`）之 Regex 格式校驗，支援前、後端雙重防護與欄位互斥限制。
-  - 結帳成功後由 Service 生成模擬發票號碼（`AB-12345678` 格式）寫入資料庫，並將發票資訊即時返回給前端顯示。
-  - **桌台狀態連動優化**：結帳或手動將訂單狀態更新為 `PAID` 時，後端會檢查該桌台是否仍有其他活動中的訂單。只有當該桌台的**所有訂單皆已結清**時，桌台狀態才會變更為 `CLEANING`（清潔中），否則維持 `OCCUPIED`（使用中），以完美支援分訂單結帳。
+- **安全防護 (RBAC & JWT)**：整合 Spring Security，支援店員角色（ADMIN、WAITER、KITCHEN）與顧客（CUSTOMER）權限管控，透過過濾器解析 Bearer Token。
+- **異常與診斷**：使用 GlobalExceptionHandler 與 ApiResponse，提供 `/api/v1/health` 健康檢查端點。
+- **即時通訊**：整合 STOMP over SockJS，即時廣播訂單狀態與看板數據。
+- **結帳與發票**：支援複合式支付（一張訂單多筆付款方式記錄）、手機載具與愛心碼 Regex 格式校驗、自動生成電子發票，並連動桌台狀態（所有活動訂單均結清後才轉為清潔中）。
 
 ### 🎨 前端架構
 - **開發環境**：React + Vite + Vanilla CSS。
-- **認證與路由守護 (Route Guards)**：
-  - 全域 `AuthContext` 狀態管理，採用 `localStorage` 同步讀寫機制，徹底排除父子組件 Effect 生命週期競態條件 (Race Condition)。
-  - 封裝 `<ProtectedRoute>`，針對未登入用戶重定向至登入頁，權限不符時導向 `/403` 自定義無權限頁。
-  - 統一攔截 `window.fetch` 以自動附帶 `Authorization: Bearer <token>` 標頭，並於 401 狀態時自動登出。
-- **樣式分離設計**：
-  - 所有 JSX 元件的樣式皆已徹底抽離至獨立的 CSS 檔案中（如 `TableList.css`, `CustomerOrder.css` 等），元件代碼乾淨清爽。
-- **WebSocket 連線**：
-  - 自訂 [useWebSocket.js](file:///d:/Learing/project/antiPOSProject/frontend/src/hooks/useWebSocket.js) React Hook，具備 5 秒延遲自動重連以及元件卸載 (unmount) 時自動斷開連線的功能。
-- **管理後台與顧客介面路由**：
-  - 看板管理 (`/admin/dashboard`)：暗色系玻璃磨砂風格即時營收數據、付款訂單數、客單價看板，結合動態 SVG 甜甜圈熱銷品項圖表，支援分類排行 Pill 按鈕切換以及單點/套餐銷售數據拆分標記展示。
-  - 桌台管理 (`/admin/tables`)：依狀態（空閒 🟢、使用中 🔴、清潔中 🟡）動態呈現卡片配色，支援狀態快速流轉與 QR Code 下載，並重構結帳與收銀行為以統一調用收銀彈窗 [CheckoutModal.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/CheckoutModal.jsx) 元件。
-  - 外場點餐 (`/admin/order`)：支援鎖定桌台、商品加點與數量備註，並具備 Modal 遮罩殘留清除與 CSS z-index 層級自動修正。
-  - 訂單審核與歷史 (`/admin/orders`)：支援搜尋與分類分頁，提供一鍵審核自點訂單、取消及結帳功能，並重構結帳與收銀行為以統一調用收銀彈窗 [CheckoutModal.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/CheckoutModal.jsx) 元件。
-  - 廚房看板 KDS (`/admin/kitchen`)：即時顯示準備中訂單，並可一鍵流轉製作狀態。
-  - 顧客自助點餐頁 (`/order?token=...`)：顧客 RWD 點餐，包含購物車 Drawer 與 WebSocket 狀態即時更新監聽，並等待顧客認證 Session 準備就緒後再拉取選單，避免存取拒絕。
+- **身分驗證**：全域 AuthContext 結合 localStorage 同步，解決非同步競態問題，並以 ProtectedRoute 進行路由守護與自動超時登出。
+- **即時看板與管理介面**：
+  - 看板管理：暗色玻璃磨砂風格，提供今日營業額、客單價及熱銷品項統計（支援單點與套餐拆分展示）。
+  - 桌台管理：卡片式呈現桌台狀態，整合狀態變更與統一的結帳彈窗 CheckoutModal。
+  - 外場點餐與 KDS：支援桌台點餐、廚房即時接單與狀態流轉。
+  - 顧客自助點餐：RWD 介面，依桌台 Token 取得暫時權限並進行點餐。
 
-### 🧪 測試與驗證資源
-- **自動化 E2E 測試**：
-  - 分類、商品與桌台測試：`scratch/test_e2e.js` (含安全性注入防護，共 76 項 API 邊緣條件測試 100% 通過)。
-  - 訂單模組測試：`brain/.../scratch/test_orders.js` (含桌台雙向連動、刪除限制與售罄驗證等 8 大核心情境 100% 通過)。
-  - 結帳功能測試：`scratch/test_checkout.js` (含重複結帳阻擋、明細加總計算，100% 通過)。
-  - WebSocket 測試：`brain/.../scratch/test_websocket.js` (含握手、事件廣播與延遲驗證共 17 項 100% 通過，廣播延遲 25ms)。
-  - 自助點餐整合測試：`scratch/test_qrcode_ordering.js` (涵蓋顧客點餐、待確認、服務生審核、狀態連動與 KDS 接單全流程，100% 通過)。
-  - 套餐與庫存統計整合測試：`scratch/test_combo_stock_and_stats.js` (含套餐項目扣減、自癒、即時銷售數據拆分統計與累計更新等驗證，100% 通過)。
-  - 複合結帳與發票整合測試：`scratch/test_compound_checkout.js` (含無參數結帳向下相容、金額不符阻擋、載具與愛心碼格式 Regex/互斥驗證，100% 通過)。
-- **安全單元測試**：
-  - `JwtTokenProviderTest.java` (驗證管理員與顧客權限宣告載荷)。
-- **Postman 集合檔案**：
-  - 位置：[postman/antiPOS_API_Collection.json](file:///d:/Learing/project/antiPOSProject/postman/antiPOS_API_Collection.json)。
-  - 包含全模組 62 個 API 測試案例。
+### 🧪 測試資源
+- **自動化 E2E 測試**：包含分類商品（test_e2e）、訂單流轉（test_orders）、結帳功能（test_checkout）、即時通訊（test_websocket）、自助點餐（test_qrcode_ordering）、庫存連動（test_combo_stock_and_stats）等 11 項測試。
+- **API 測試**：Postman 集合檔案（包含 62 個 API 測試案例）。
 
 ---
 
 ## 2. 已完成的工單與變更
 
-### 📅 2026-05-23 | [Jira: POS-72] Phase2 專案審視與優化 (收銀彈窗重構與安全性安全機制優化)
-- **收銀與拆帳前端組件抽離與重構**：
-  - 建立統一的 [CheckoutModal.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/CheckoutModal.jsx) 元件，集中處理複合支付、拆帳、載具與愛心碼校驗等結帳收銀行為。
-  - 重構 [TableList.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/TableList.jsx) 與 [OrderList.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/OrderList.jsx)，移除重複的收銀邏輯程式碼，改為調用統一的 `<CheckoutModal>`，大幅簡化組件體積與提高維護性。
-  - 建立專屬格式化工具 [formatters.js](file:///d:/Learing/project/antiPOSProject/frontend/src/utils/formatters.js)，抽離客製化選項文字拼接與時間日期格式化邏輯。
-- **後端安全防護與冗餘清理**：
-  - 移除冗餘 CORS 配置檔 `CorsConfig.java`，統一交由 [WebMvcConfig.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/common/WebMvcConfig.java) 管理跨域請求。
-  - 刪除測試用的 `HelloController.java`，改用新建立的 [HealthCheckController.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/controller/HealthCheckController.java)，實作 `/api/v1/health` 的連線探測及 `/api/v1/health/error-test` 以驗證全域例外攔截與 `400 Bad Request` 回傳格式。
-  - 在 [SecurityConfig.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/common/SecurityConfig.java) 中移除 `/api/tables/*/qrcode` 的公開權限，統一將健康檢查相關路徑 `/api/v1/health/**` 加入公開許可白名單。
-  - 修復 [JwtTokenProvider.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/common/JwtTokenProvider.java) 中 role 與 additionalClaims 相互覆蓋的 issue：先建立 mutable Map 合併 claims 後才送入 JWT builder，確保 JWT 聲明內容完整。
-- **驗證成果**：
-  - 調整 `scratch/run_all_tests.js` 測試流程，在發生 DB 重置失敗時顯示詳細 stdout/stderr，提升測試診斷效率。
-  - 執行全自動 Regression E2E 測試，11 個測試套件 (含複合結帳、併單結帳、桌台過渡、併發與 WebSocket) **100% 全數通過**。
+### 📅 2026-05-23 | [Jira: POS-72] Phase2 專案審視與優化
+- **前端收銀彈窗重構**：建立統一的 CheckoutModal 元件，將 TableList 與 OrderList 的收銀、拆帳、載具校驗邏輯合併，精簡 600 行程式碼。
+- **後端安全防護**：移除冗餘 CORS 設定，將 `/api/tables/*/qrcode` 限制為 ADMIN/WAITER，增加 `/api/v1/health` 健康檢查端點並調整白名單，修正 JWT role 被覆蓋問題。
+- **測試優化**：優化 E2E 測試腳本容錯與錯誤診斷能力，11 項測試 100% 通過。
 
-### 📅 2026-05-23 | [Jira: POS-56] 複合式結帳與模擬電子發票模組 (Checkout Engine & E-Invoice)
-- **資料庫欄位設計與測試資料初始化**：
-  - 修改 `schema.sql` 增加發票號碼 `invoice_no`、手機載具 `carrier_no`、愛心碼 `love_code` 至 `orders` 表。
-  - 新增 `order_payment` 紀錄表，用以維護每一筆訂單的多個付款細項（金額與方式）。
-- **後端架構與業務邏輯**：
-  - 建立 `OrderPayment` 實體與 `CheckoutRequest` DTO。
-  - 實作 `InvoiceService` 與 `InvoiceServiceImpl` 以 Regex 校驗台灣手機載具（`^\/[A-Z0-9.+-]{7}$`）與愛心碼（`^[0-9]{3,7}$`），並生成隨機發票號碼。
-  - 修改 `OrderServiceImpl` 結帳邏輯：支援複合支付方式加總與訂單總額比對、載具與愛心碼格式/互斥校驗、儲存發票及支付紀錄，並連動桌台狀態為清潔中。無參數時預設為 100% 現金以向下相容。
-  - 修改 `OrderController` 的結帳端點接收 `CheckoutRequest`。
-- **前端結帳 Modal 重構與拆帳功能增強**：
-  - 重構結帳確認彈窗：支援動態「新增/刪除」付款方式列，輸入個別金額，並進行加總與總金額校驗；加入手機載具與愛心碼互斥校驗；結帳成功後於自訂 Success Modal 中顯示發票號碼。
-  - **分訂單結帳**：在結帳彈窗中為每筆訂單加入核取方塊，支援服務生選取特定訂單進行個別結帳，總計金額會自動連動更新。
-  - **尚未歸屬金額提示**：即時比對付款金額加總與結帳總額，並以綠色（完全分配）、黃/橘色（尚未歸屬）、紅色（超出分配）動態顯示狀態及相差金額，以獲得極致的 UI 視覺引導。
-  - **人數平分功能**：支援在結帳 Modal 中輸入平分人數，一鍵將總金額平分，若除不盡（無法整除），餘數會自動加給第一筆付款列。
-- **驗證成果**：
-  - 撰寫與更新 `scratch/test_compound_checkout.js` 整合測試，除了覆蓋無參數結帳（相容性）、格式/互斥錯誤攔截、複合式結帳、金額不符拒絕之外，亦新增了桌台分訂單結帳時桌台狀態過渡（Test 5）的驗證。
-  - 修正了舊測試 `test_orders.js` 中的過期斷言，以配合新的分訂單結帳桌台狀態流轉邏輯。
-  - 所有整合測試與後端 `.\mvnw test` **100% 成功通過**（11/11 E2E tests PASS）。
+### 📅 2026-05-23 | [Jira: POS-56] 複合式結帳與模擬電子發票模組
+- **資料庫更新**：新增發票欄位、手機載具、愛心碼至 orders 表，新增 order_payment 付款明細表。
+- **後端商務邏輯**：實作台灣手機載具與愛心碼格式 Regex 檢驗與互斥限制，結帳後自動生成發票編號並連動桌台狀態。
+- **前端拆帳與平分**：結帳彈窗支援動態付款列、未分配金額動態提示、人數平分與除不盡餘數自動分配。
 
-### 📅 2026-05-22 | [Jira: POS-55] 管理員即時營收與庫存數據看板 (Dashboard)
-- **資料庫欄位設計與測試資料初始化**：
-  - 修改 `schema.sql` 增加商品庫存 `stock` 與預警門檻 `stock_alert_threshold` 欄位。
-  - 在 `bundle_item` 表中引入 `product_id` 欄位與外鍵約束，將固定套餐子項目直接關聯至對應商品。
-  - 修改 `data.sql` 初始化預設庫存、警報數值，新增「貢丸湯」(ID 12) 並更新固定套餐項目 (A/B 套餐) 對應的 `product_id`。
-- **後端實體與 MyBatis 映射**：
-  - 更新 `Product.java` 屬性並在 `ProductMapper.xml` 映射新增庫存欄位，調整 `insert` 與 `update` SQL。
-  - 在 `BundleItem.java` 與 `ProductMapper.xml` 的 `bundleItemResultMap` 中新增 `productId` 屬性映射。
-- **即時看板數據 API 與 WebSocket 廣播**：
-  - 建立 `DashboardDataDTO.java` 數據格式，並重構 `DashboardMapper.xml` 的 `getTodayTopProducts` SQL：透過 `LEFT JOIN` 同時統計「單點銷量」與「套餐內銷售量」，並加總為總銷量，移除 `LIMIT 5` 以便前端靈活對所有銷售商品進行分類排行與展示。
-  - 實作 `DashboardServiceImpl.java` 利用台北時間進行數據運算與 WebSocket `/topic/dashboard` 廣播。
-  - 開發 `DashboardController.java` 提供 `/api/dashboard/today` 端點，並在 `SecurityConfig.java` 限制為 `ADMIN` 角色存取。
-- **庫存扣減時機、取消回補與即時連動機制**：
-  - 修改 `OrderServiceImpl.java` 中的扣減時機：在點單或服務生審核完成（訂單轉為 `PENDING`）時即刻扣減庫存；在訂單取消（`CANCELLED`，且原狀態非 `PENDING_CONFIRM`）時自動回補庫存，並防止結帳/付款成功（`PAID`）時重複扣減。
-  - 支援套餐/自選組合（Combo Options）之庫存連動，在訂單建立與取消時遞迴更新選定商品（透過 `selected_product_id`）的庫存數量。
-  - **固定套餐子品項庫存與銷量統計自癒**：在 `createOrder` 時，若為固定套餐項目，則自動為其建立對應的 `OrderItemOption` 並記錄選定的商品 ID，使固定配餐項目也能正確連動庫存扣減/回補，並能在看板中被精確統計。
-  - 實作商品售罄與上架自動流轉：庫存扣減為 0 時商品狀態自動設為 `SOLD_OUT`，回補庫存使數量大於 0 時，原售罄商品自動恢復為 `AVAILABLE`（僅限自動售罄之商品）。
-  - 修改 `ProductServiceImpl.java`，在管理員手動調整庫存或變更售罄狀態時，觸發即時同步與 WebSocket 廣播。
-- **前端即時看板 UI/UX (Premium Design)**：
-  - 創建 `AdminDashboard.jsx` 看板頁面，以磨砂玻璃風格 (Glassmorphism) 設計今日營業額、付款訂單數與客單價卡片，並運用原生 SVG 實現具懸浮互動的甜甜圈熱銷品項圖表。
-  - **分類 Tab 選擇器與單點/套餐銷售標記**：在「Top 5 熱銷品項」卡片頂部加入分類選擇器（全部、主餐、小菜、飲料），點選不同分類時動態呈現該分類的銷售排行；並在排行列表與圓餅圖懸停細節中，標註商品單點銷量與套餐內銷量，如 `紅茶 50 (單點 10 / 套餐 40)`。
-  - 實作即時 Toast 提示與庫存警報清單連動，在 App.jsx 註冊 `/admin/dashboard` 路由並設定 `ADMIN` 自動跳轉。
-- **驗證成果**：
-  - 撰寫 `scratch/test_stock_lifecycle.js` 整合測試，完整覆蓋基本的庫存生命週期情境。
-  - 新增 `scratch/test_combo_stock_and_stats.js` 整合測試，專門驗證「套餐項目扣減、自癒、即時銷售數據拆分統計功能」，測試 **100% 成功通過**。
-  - 執行後端單元與整合測試（`.\mvnw test`）共 8 個測試案例 **100% 成功通過**。
+### 📅 2026-05-22 | [Jira: POS-55] 管理員即時營收與庫存數據看板
+- **資料庫更新**：新增商品庫存與預警門檻欄位，套餐子項目關聯商品實體。
+- **即時數據統計**：實作熱銷品項 SQL 聯表統計（拆分單點與套餐銷售量），並透過 WebSocket 實時廣播。
+- **庫存自動增減與自癒**：
+  - 點單或審核通過時扣減庫存，取消時回補庫存，並防止重複扣減。
+  - 支援套餐/組合商品之遞迴庫存扣減。
+  - 庫存為 0 時商品狀態自動設為 SOLD_OUT，回補後自動恢復 AVAILABLE。
+- **前端看板 UI/UX**：玻璃磨砂風格卡片，結合 SVG 甜甜圈圓餅圖與分類 Tab 選擇器。
 
 ### 📅 2026-05-22 | [Jira: POS-54] 系統權限控管與安全機制 (RBAC & JWT)
-- **後端安全基礎建設與 JWT 整合**：
-  - 引入 `spring-boot-starter-security` 與 `jjwt` 進行無狀態身分驗證。
-  - 實作 `SecurityConfig` 設定全域 API 角色存取規則：開放 `/api/auth/**`、`/api/tables/token/*`、`/api/tables/*/qrcode`、`/ws/**` 等端點，並允許 `/error` 以免錯誤導引被阻攔。
-  - 實作 `JwtAuthenticationFilter` 解析 `Bearer <token>` 請求頭，並注入 `SecurityContext`。
-  - 實作 `JwtTokenProvider` 簽發與驗證管理員 JWT 以及顧客 `CUSTOMER` 暫時 JWT。
-- **使用者認證模型與資料庫整合**：
-  - 新增 `users` 資料表與對應 `User` 實體、Mapper 及 `CustomUserDetailsService`，使用 BCrypt 加密密碼，預設插入 `admin`、`waiter`、`kitchen` 用戶。
-- **前端路由守護與 Race Condition 解決**：
-  - 封裝 `<ProtectedRoute>` 依角色阻擋存取，不符權限重定向至 `/403` 頁面。
-  - 重構 `AuthContext` 之 `login`、`logout` 與 `setCustomerSession` 使其同步讀寫 `localStorage`，徹底解決子組件 `useEffect` (請求選單 API) 先於父組件 (同步寫入 Token) 執行所導致的未授權 403 競態錯誤。
-  - 調整 `CustomerOrder.jsx` 控制閥，待顧客 session 同步掛載至 context 後再請求選單與商品。
-- **驗證成果**：
-  - 新增 `JwtTokenProviderTest.java` 進行 Token 安全校驗。
-  - `.\mvnw test` 通過所有安全及業務邏輯測試，`npm run lint` 完全無警告，`npm run build` 打包順暢。
+- **後端安全建置**：整合 Spring Security 與 jjwt，建立 JwtAuthenticationFilter，配置 API 角色存取權限。
+- **資料庫整合**：建立 users 資料表，使用 BCrypt 加密密碼，預設插入系統店員帳號。
+- **競態問題修復**：重構 AuthContext 使其與 localStorage 同步讀寫，徹底排除點餐頁未授權 403 競態錯誤。
 
-### 📅 2026-05-22 | [Jira: POS-48] 結構化商品客製化選項與加價系統 (含套餐二次客製化)
-- **資料庫設計與初期設定**：
-  - 新增 `modifier_group` (修飾器群組)、`modifier_option` (客製化選項)、`product_modifier_group` (商品群組關聯)、`order_item_option` (訂單選項歷史) 等表。
-  - 新增 `option_modifier_group` 關聯表，以設定父客製化選項 (如套餐) 所關聯的二級客製化群組 (如甜度、冰塊)。
-  - 在 `order_item_option` 中新增 `parent_id` 欄位，用以維護子客製化選項對父客製化選項的歸屬。
-  - 於 `data.sql` 中插入套餐關聯資料，將「升級 B 套餐 (燙青菜 + 紅茶)」關聯至「甜度」與「冰塊」群組。
-- **後端架構與業務邏輯**：
-  - 實體類新增對應屬性，擴充 MyBatis ResultMap 級聯加載一級與二級客製化群組。
-  - 於 `OrderServiceImpl` 的 `createOrder` 方法中實作客製化防護驗證與動態加價計算，支援一級與二級客製化群組之 `minSelection`/`maxSelection` 遞迴驗證，並在訂單存檔時以正確的 `parentId` 層級關係存入資料庫。
-- **套餐分類自選品項與補差額計算 (動態套餐項目)**：
-  - **資料庫與測試資料**：修改 `schema.sql` 與 `data.sql`，為 `bundle_item` 引入 `target_category_id` (指定分類自選) 與 `base_allowance` (基本折抵額)；為 `order_item_option` 新增 `selected_product_id` 紀錄實際選定的自選商品。新增「升級 C 套餐 (自選小菜 + 自選飲料)」測試資料、小菜新品項 (黃金泡菜、皮蛋豆腐) 等。
-  - **後端商務與驗證邏輯**：在 `OrderServiceImpl` 中檢驗自選商品的分類匹配度與供應狀態 (`AVAILABLE`)，並計算超額差額 `MAX(0, product.price - base_allowance)` 累加為套餐修飾加價，並在資料庫保存對應的 `selected_product_id` 以完成關聯紀錄。
-  - **前端互動 UI**：在 `CustomerOrder` (前台自點) 與 `OrderInterface` (外場點餐) 引入動態商品分區按鈕 (Pills)，實時呈現各品項超額的額外補差價、將選定品項對應 ID 與二級客製化組合為正確的 JSON Payload 進行送單，並於 `TableList`、`OrderList` 及 `KitchenDisplay` (KDS) 正確轉譯並印出實際自選商品的名稱與加價（例如：`黃金泡菜(+$5)` 替代原本的分類佔位符）。
-- **前端介面與客製化 Modal**：
-  - 顧客自助點餐與外場點餐介面中，針對一級客製化選項下方新增二級客製化群組的嵌套展開與收合。
-  - 實作切換或取消父選項時自動清除子選項選擇狀態的防錯邏輯，以及針對子選項的必選初始化設定。
-  - 品項加總與購物車格式化展示優化，支援遞迴計價並以 `升級 B 套餐 (燙青菜 + 紅茶)(+$60) (無糖 / 去冰)` 格式呈現。
-  - 於後台訂單管理（`OrderList`）渲染客製化細項。
-- **廚房看板 (KDS) 套餐直列顯示**：
-  - 修改 `KitchenDisplay` 的解析渲染邏輯，若品項為套餐升級，則自動解析為直列子項目（如 `- 燙青菜`、`- 紅茶 [無糖] [去冰]`），其餘一般客製化選項則維持以 Badge 形式呈現在下方，有效防範廚房漏看。
-- **自動化測試驗證**：
-  - 擴充 `scratch/test_modifiers.js` 整合測試，涵蓋商品選項查詢、防護限制、動態價格計算、錯誤傳參攔截，以及套餐二次客製化、動態自選套餐訂單建立、差額計算及分類防護驗證，測試 100% 通過。
+### 📅 2026-05-21 | [Jira: POS-48] 結構化商品客製化選項與加價系統
+- **資料表建立**：新增 modifier_group, modifier_option, product_modifier_group, order_item_option 及其 parent_id。
+- **套餐二次客製化**：支援套餐子品項二級客製化（如甜度、冰塊）與 min/max 選擇驗證。
+- **動態套餐自選與價差計算**：支援套餐項目依分類自選並計算超額補差價。
+- **KDS 直列呈現**：優化廚房看板，將套餐項目自動展開直列顯示，防止漏單。
 
 ### 📅 2026-05-21 | [Jira: POS-47] 第一階段專案審視與優化
-- **後端優化**：
-  - 刪除冗餘且具安全性疑慮的測試端點 `DebugController.java` 與空設定檔 `application.yml`。
-  - 規範 Service 層例外處理，將通用 `RuntimeException` 改為丟出 `IllegalArgumentException`，使 API 能正確回傳 400 錯誤。
-  - 微調訂單流水號產生器，將 `new Random()` 替換為 `ThreadLocalRandom.current()` 提升高併發性能。
-- **前端樣式分離與 ESLint 清理**：
-  - 抽取內嵌在 JSX 中的 CSS 樣式至獨立 CSS 檔案並導入（包含 `OrderList.css`, `TableList.css`, `KitchenDisplay.css`, `OrderInterface.css`, `CustomerOrder.css`）。
-  - 移除多個前端檔案頂部未使用的 ESLint 註釋，改在 `useEffect` 中受影響的特定 state-modifying 呼叫行上方加上精準的 `// eslint-disable-next-line react-hooks/set-state-in-effect` 註解。
-- **驗證成果**：
-  - 後端 `.\mvnw test` 測試全數通過（共 5 項測試）。
-  - 前端 `npm run lint` 檢測完全無警告與錯誤。
-  - 前端 `npm run build` 打包與編譯順利完成。
+- **後端清理**：刪除 DebugController，規範 Service 層例外處理，優化流水號高併發性能。
+- **前端重構**：分離 CSS 檔案，清理 ESLint 警告並完成生產環境編譯測試。
 
 ### 📅 2026-05-21 | [Jira: POS-41] QR Code 自助點餐系統
-- **後端 API 與自點流程**：
-  - 於 `DiningTable` 新增桌台 `token` UUID 欄位，實作透過 Token 取得桌台詳情及 QR Code 二進位生成下載端點。
-  - 支援 `order.require-staff-confirm` 設定開關，自點訂單初始狀態轉為 `PENDING_CONFIRM`，服務生審核確認後更新為 `PENDING`，外場手動點餐不受限制直接為 `PENDING`。
-  - 實作 WebSocket 事件與 `PENDING_CONFIRM` 狀態相容，支援 KDS 即時接單。
-- **前端自助點餐與審核**：
-  - 桌台管理介面支援查看與下載專屬 PNG QR Code。
-  - 新增顧客 RWD 點餐介面 `CustomerOrder.jsx`（支援選單、客製化備註、購物車 Drawer、訂單送出與 WebSocket 即時狀態變更監聽）。
-  - 新增後台服務員 `OrderList.jsx`（包含待確認、活動中、歷史訂單分頁，支援搜尋與一鍵確認、取消及結帳功能）。
-- **驗證成果**：
-  - 新增整合測試 `scratch/test_qrcode_ordering.js`，100% 通過。
+- **自點流程**：新增桌台 Token UUID 欄位，支援掃碼並提供 waiter 一鍵確認、取消與結帳。
+- **自助介面**：新增顧客 RWD 點餐頁，桌台管理支援 QR Code PNG 下載。
 
 ### 📅 2026-05-21 | [Jira: POS-33] WebSocket 即時通訊與桌台狀態推播
-- **後端 WebSocket 基礎建設**：
-  - 新增 `spring-boot-starter-websocket` 依賴。
-  - 實作 `WebSocketConfig.java`：啟用 `@EnableWebSocketMessageBroker`，設定 STOMP endpoint `/ws`（含 SockJS fallback）、Simple Broker `/topic`、Application Prefix `/app`。
-- **即時通知與廣播功能**：
-  - 實作 `OrderEventDTO`，於訂單新增（`ORDER_CREATED`）、狀態更新（`ORDER_STATUS_CHANGED`）及結帳（`ORDER_STATUS_CHANGED`）時廣播至 `/topic/orders`。
-  - 當桌台狀態實際改變時（如清潔完成 `CLEANING` ➔ `EMPTY`），廣播 `TABLE_STATUS_CHANGED` 進行自動化桌台卡片刷新。
-- **前端 WebSocket Hook**：
-  - 封裝 `useWebSocket.js`，支援 5 秒自動重連及 Unmount 清理，並整合至 `TableList.jsx` 與 `OrderInterface.jsx`。
+- **WebSocket 機制**：後端建置 STOMP Message Broker，前端封裝 useWebSocket 提供 5 秒自動重連。
+- **狀態通知**：點單、狀態流轉、結帳、桌台清潔完成等事件即時通知與推播。
 
 ### 📅 2026-05-18 | [Jira: POS-23] 專用結帳功能與異常防護
-- **後端專用結帳 API**：
-  - 新增 `POST /api/orders/{id}/checkout` 端點，由後端重新加總計算消費明細確保金額一致，並自動連動桌台狀態變更為 `CLEANING`。
-- **異常防護與自癒**：
-  - 在結帳發生衝突或重複點擊時，自動重新拉取桌台最新未結帳訂單，提供完善的錯誤自癒機制。
+- **結帳 API**：新增專用結帳端點，後端重計金額確保一致性，並提供錯誤自癒機制。
 
 ### 📅 2026-05-16 | [Jira: POS-22] 前端外場點餐介面與結帳流程
-- **外場點餐元件**：
-  - 新增 `OrderInterface.jsx`。
-- **Bug 修復與互動體驗優化**：
-  - 修復點餐返回後下拉選單失效 Bug（藉由 CSS `display: none` 取代 React 條件銷毀）。
-  - 修復彈窗遮罩殘留與 z-index 重疊問題。
-  - 將 `alert()` 替換為 React 自訂玻璃磨砂成功彈窗，並移除所有偵錯代碼。
+- **介面實作**：外場點餐 UI（OrderInterface），修復 dropdown 銷毀失效、z-index 遮罩殘留與彈窗重疊問題。
 
 ### 📅 2026-05-15 | [Jira: POS-21] 後端訂單系統 API
-- **訂單 API 實作**：
-  - 包含 `Order` 與 `OrderItem` CRUD、狀態變更與聯表查詢明細 API (`/api/orders`)。
-- **編號規則與狀態連動**：
-  - 固定 15 碼 `TW-YYMMDD-XXXXX`（台北時間，排除易混淆字元）。
-  - 建立一桌多單、新增付款與取消的桌台狀態流轉規則。
-- **業務安全驗證**：
-  - 阻擋購買 `SOLD_OUT`/`HIDDEN` 的下架或售完商品，限制未付款活動中訂單的直接刪除。
+- **訂單 API**：訂單 CRUD、15 碼流水號生成，限制未付款訂單刪除與 SOLD_OUT 商品點購。
 
 ### 📅 2026-05-12 | [Jira: POS-18] 前端桌台管理 UI
-- **實作元件**：`TableList.jsx`，卡片式 Grid 網格排版，依狀態變更配色（空閒 🟢、使用中 🔴、清潔中 🟡），並加入側邊欄入口。
+- **桌台 UI**：卡片式呈現空閒、使用中、清潔中狀態。
 
 ### 📅 2026-05-10 | [Jira: POS-14] 後端桌台管理 API
-- **實作內容**：桌台 CRUD 與狀態流轉，導入 `@Valid` Bean Validation 提供繁體中文出錯提示。
+- **桌台 API**：桌台 CRUD 與狀態流轉，整合 Bean Validation 中文提示。

@@ -27,6 +27,8 @@
 - **異常與錯誤處理**：
   - 採用 `GlobalExceptionHandler` 搭配統一格式的 `ApiResponse`。
   - 服務層 (Service) 例外已收斂為 mapping-compatible exceptions (如 `IllegalArgumentException`)，拋出時會自動轉化為 `400 Bad Request`，保障 API 的防護與穩定度。
+- **系統健康狀態與診斷**：
+  - 新增 [HealthCheckController.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/controller/HealthCheckController.java) 及 `/api/v1/health` 公開端點，提供系統連線診斷及 GlobalExceptionHandler 對 `IllegalArgumentException` 轉 400 錯誤之驗證工具。
 - **即時通訊服務**：
   - 整合 `spring-boot-starter-websocket` 與 STOMP over SockJS。
   - 廣播主題包含為廚房與外場桌台設計的 `/topic/orders` (傳遞 `OrderEventDTO` 與 `TableStatusEvent` 事件載荷)，以及專供看板即時更新的 `/topic/dashboard`。
@@ -50,9 +52,9 @@
   - 自訂 [useWebSocket.js](file:///d:/Learing/project/antiPOSProject/frontend/src/hooks/useWebSocket.js) React Hook，具備 5 秒延遲自動重連以及元件卸載 (unmount) 時自動斷開連線的功能。
 - **管理後台與顧客介面路由**：
   - 看板管理 (`/admin/dashboard`)：暗色系玻璃磨砂風格即時營收數據、付款訂單數、客單價看板，結合動態 SVG 甜甜圈熱銷品項圖表，支援分類排行 Pill 按鈕切換以及單點/套餐銷售數據拆分標記展示。
-  - 桌台管理 (`/admin/tables`)：依狀態（空閒 🟢、使用中 🔴、清潔中 🟡）動態呈現卡片配色，支援狀態快速流轉與 QR Code 下載。
+  - 桌台管理 (`/admin/tables`)：依狀態（空閒 🟢、使用中 🔴、清潔中 🟡）動態呈現卡片配色，支援狀態快速流轉與 QR Code 下載，並重構結帳與收銀行為以統一調用收銀彈窗 [CheckoutModal.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/CheckoutModal.jsx) 元件。
   - 外場點餐 (`/admin/order`)：支援鎖定桌台、商品加點與數量備註，並具備 Modal 遮罩殘留清除與 CSS z-index 層級自動修正。
-  - 訂單審核與歷史 (`/admin/orders`)：支援搜尋與分類分頁，提供一鍵審核自點訂單、取消及結帳功能。
+  - 訂單審核與歷史 (`/admin/orders`)：支援搜尋與分類分頁，提供一鍵審核自點訂單、取消及結帳功能，並重構結帳與收銀行為以統一調用收銀彈窗 [CheckoutModal.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/CheckoutModal.jsx) 元件。
   - 廚房看板 KDS (`/admin/kitchen`)：即時顯示準備中訂單，並可一鍵流轉製作狀態。
   - 顧客自助點餐頁 (`/order?token=...`)：顧客 RWD 點餐，包含購物車 Drawer 與 WebSocket 狀態即時更新監聽，並等待顧客認證 Session 準備就緒後再拉取選單，避免存取拒絕。
 
@@ -74,7 +76,21 @@
 ---
 
 ## 2. 已完成的工單與變更
- 
+
+### 📅 2026-05-23 | [Jira: POS-72] Phase2 專案審視與優化 (收銀彈窗重構與安全性安全機制優化)
+- **收銀與拆帳前端組件抽離與重構**：
+  - 建立統一的 [CheckoutModal.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/CheckoutModal.jsx) 元件，集中處理複合支付、拆帳、載具與愛心碼校驗等結帳收銀行為。
+  - 重構 [TableList.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/TableList.jsx) 與 [OrderList.jsx](file:///d:/Learing/project/antiPOSProject/frontend/src/components/admin/OrderList.jsx)，移除重複的收銀邏輯程式碼，改為調用統一的 `<CheckoutModal>`，大幅簡化組件體積與提高維護性。
+  - 建立專屬格式化工具 [formatters.js](file:///d:/Learing/project/antiPOSProject/frontend/src/utils/formatters.js)，抽離客製化選項文字拼接與時間日期格式化邏輯。
+- **後端安全防護與冗餘清理**：
+  - 移除冗餘 CORS 配置檔 `CorsConfig.java`，統一交由 [WebMvcConfig.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/common/WebMvcConfig.java) 管理跨域請求。
+  - 刪除測試用的 `HelloController.java`，改用新建立的 [HealthCheckController.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/controller/HealthCheckController.java)，實作 `/api/v1/health` 的連線探測及 `/api/v1/health/error-test` 以驗證全域例外攔截與 `400 Bad Request` 回傳格式。
+  - 在 [SecurityConfig.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/common/SecurityConfig.java) 中移除 `/api/tables/*/qrcode` 的公開權限，統一將健康檢查相關路徑 `/api/v1/health/**` 加入公開許可白名單。
+  - 修復 [JwtTokenProvider.java](file:///d:/Learing/project/antiPOSProject/backend/src/main/java/com/project/backend/common/JwtTokenProvider.java) 中 role 與 additionalClaims 相互覆蓋的 issue：先建立 mutable Map 合併 claims 後才送入 JWT builder，確保 JWT 聲明內容完整。
+- **驗證成果**：
+  - 調整 `scratch/run_all_tests.js` 測試流程，在發生 DB 重置失敗時顯示詳細 stdout/stderr，提升測試診斷效率。
+  - 執行全自動 Regression E2E 測試，11 個測試套件 (含複合結帳、併單結帳、桌台過渡、併發與 WebSocket) **100% 全數通過**。
+
 ### 📅 2026-05-23 | [Jira: POS-56] 複合式結帳與模擬電子發票模組 (Checkout Engine & E-Invoice)
 - **資料庫欄位設計與測試資料初始化**：
   - 修改 `schema.sql` 增加發票號碼 `invoice_no`、手機載具 `carrier_no`、愛心碼 `love_code` 至 `orders` 表。
@@ -85,11 +101,10 @@
   - 修改 `OrderServiceImpl` 結帳邏輯：支援複合支付方式加總與訂單總額比對、載具與愛心碼格式/互斥校驗、儲存發票及支付紀錄，並連動桌台狀態為清潔中。無參數時預設為 100% 現金以向下相容。
   - 修改 `OrderController` 的結帳端點接收 `CheckoutRequest`。
 - **前端結帳 Modal 重構與拆帳功能增強**：
-  - 重構 `TableList.jsx` 結帳確認彈窗：支援動態「新增/刪除」付款方式列，輸入個別金額，並進行加總與總金額校驗；加入手機載具與愛心碼互斥校驗；結帳成功後於自訂 Success Modal 中顯示發票號碼。
-  - **分訂單結帳**：在 `TableList.jsx` 結帳彈窗中為每筆訂單加入核取方塊，支援服務生選取特定訂單進行個別結帳，總計金額會自動連動更新。
-  - **尚未歸屬金額提示**：在 `TableList.jsx` 與 `OrderList.jsx` 中，即時比對付款金額加總與結帳總額，並以綠色（完全分配）、黃/橘色（尚未歸屬）、紅色（超出分配）動態顯示狀態及相差金額，以獲得極致的 UI 視覺引導。
+  - 重構結帳確認彈窗：支援動態「新增/刪除」付款方式列，輸入個別金額，並進行加總與總金額校驗；加入手機載具與愛心碼互斥校驗；結帳成功後於自訂 Success Modal 中顯示發票號碼。
+  - **分訂單結帳**：在結帳彈窗中為每筆訂單加入核取方塊，支援服務生選取特定訂單進行個別結帳，總計金額會自動連動更新。
+  - **尚未歸屬金額提示**：即時比對付款金額加總與結帳總額，並以綠色（完全分配）、黃/橘色（尚未歸屬）、紅色（超出分配）動態顯示狀態及相差金額，以獲得極致的 UI 視覺引導。
   - **人數平分功能**：支援在結帳 Modal 中輸入平分人數，一鍵將總金額平分，若除不盡（無法整除），餘數會自動加給第一筆付款列。
-  - 重構 `OrderList.jsx`：將原本直接結帳的行為改為開啟結帳確認彈窗（與 `TableList.jsx` Modal 邏輯及樣式一致），全面支援複合支付、載具、愛心碼輸入、成功後發票號碼展示、未歸屬金額提示與平分人數計算。
 - **驗證成果**：
   - 撰寫與更新 `scratch/test_compound_checkout.js` 整合測試，除了覆蓋無參數結帳（相容性）、格式/互斥錯誤攔截、複合式結帳、金額不符拒絕之外，亦新增了桌台分訂單結帳時桌台狀態過渡（Test 5）的驗證。
   - 修正了舊測試 `test_orders.js` 中的過期斷言，以配合新的分訂單結帳桌台狀態流轉邏輯。

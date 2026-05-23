@@ -49,10 +49,12 @@ public class JwtTokenProvider {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expirationMs);
 
+        Map<String, Object> claims = new HashMap<>(additionalClaims);
+        claims.put("role", role);
+
         return Jwts.builder()
+                .claims(claims)
                 .subject(username)
-                .claim("role", role)
-                .claims(additionalClaims)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(secretKey)

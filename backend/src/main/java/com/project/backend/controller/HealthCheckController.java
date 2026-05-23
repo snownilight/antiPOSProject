@@ -9,19 +9,19 @@ import com.project.backend.common.ApiResponse;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/hello")
-public class HelloController {
+@RequestMapping("/api/v1/health")
+public class HealthCheckController {
 
     /**
      * 測試正常回傳 ApiResponse
      */
     @GetMapping
-    public ApiResponse<Map<String, String>> sayHello() {
+    public ApiResponse<Map<String, String>> checkHealth() {
         var data = Map.of(
-            "status", "running",
+            "status", "UP",
             "framework", "Spring Boot 3 + Java 21"
         );
-        return ApiResponse.success("Hello API 測試成功！", data);
+        return ApiResponse.success("HealthCheck API 測試成功！", data);
     }
 
     /**

@@ -43,9 +43,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/v1/hello/**").permitAll()
+                .requestMatchers("/api/v1/health", "/api/v1/health/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/tables/token/*").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/tables/*/qrcode").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/error").permitAll()
                 

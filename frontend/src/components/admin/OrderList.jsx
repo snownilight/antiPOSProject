@@ -1,116 +1,13 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Spinner, Badge, Modal, Form } from 'react-bootstrap';
+import { Spinner, Badge, Modal } from 'react-bootstrap';
 import API_BASE_URL from '../../utils/api';
 import useWebSocket from '../../hooks/useWebSocket';
+import CheckoutModal from './CheckoutModal';
+import { formatOrderOptions, formatTime } from '../../utils/formatters';
 import './OrderList.css';
 
-const formatOrderOptions = (options) => {
-  if (!options || options.length === 0) return '';
 
-  const parentOptions = options.filter(o => !o.parentId);
-  const childOptions = options.filter(o => o.parentId);
-
-  const childMap = {};
-  childOptions.forEach(child => {
-    const pId = child.parentId;
-    if (!childMap[pId]) {
-      childMap[pId] = [];
-    }
-    childMap[pId].push(child);
-  });
-
-  const formattedParents = parentOptions.map(parent => {
-    const parentChildren = childMap[parent.id] || childMap[parent.optionId] || [];
-    const match = parent.optionName.match(/\(([^)]+)\)/);
-    
-    if (match) {
-      const content = match[1];
-      const rawItems = content.split('+').map(x => x.trim());
-      
-      const cleanedParentName = parent.optionName.replace(/\s*\([^)]*\)/g, '').trim();
-      let parentText = cleanedParentName;
-      if (parent.priceModifier > 0) {
-        parentText += ` (+$${parent.priceModifier})`;
-      }
-
-      const biTexts = [];
-      const isBeverageOrSoup = (name) => {
-        const keywords = ["茶", "奶", "水", "汁", "咖啡", "蜜", "汽水", "可樂", "湯", "飲"];
-        return keywords.some(kw => name.includes(kw));
-      };
-      let legacyTargetIdx = rawItems.findIndex(isBeverageOrSoup);
-      if (legacyTargetIdx === -1) {
-        legacyTargetIdx = rawItems.length - 1;
-      }
-
-      rawItems.forEach((subName, idx) => {
-        const subOpts = parentChildren.filter(c => c.bundleItemName === subName);
-        const legacyOpts = parentChildren.filter(c => !c.bundleItemName);
-        
-        const allOptsForSub = [...subOpts];
-        if (idx === legacyTargetIdx && legacyOpts.length > 0) {
-          allOptsForSub.push(...legacyOpts);
-        }
-
-        if (allOptsForSub.length > 0) {
-          const prodOpt = allOptsForSub.find(c => c.selectedProductId);
-          const subOptsWithoutProd = allOptsForSub.filter(c => !c.selectedProductId);
-
-          if (prodOpt) {
-            let prodName = prodOpt.optionName;
-            if (prodOpt.priceModifier > 0) {
-              prodName += `(+$${prodOpt.priceModifier})`;
-            }
-            if (subOptsWithoutProd.length > 0) {
-              const subOptNames = subOptsWithoutProd.map(c => {
-                let name = c.optionName;
-                if (c.priceModifier > 0) {
-                  name += `(+$${c.priceModifier})`;
-                }
-                return name;
-              }).join('、');
-              biTexts.push(`${prodName}（${subOptNames}）`);
-            } else {
-              biTexts.push(prodName);
-            }
-          } else {
-            const subOptNames = allOptsForSub.map(c => {
-              let name = c.optionName;
-              if (c.priceModifier > 0) {
-                name += `(+$${c.priceModifier})`;
-              }
-              return name;
-            }).join('、');
-            biTexts.push(`${subName}（${subOptNames}）`);
-          }
-        } else {
-          biTexts.push(subName);
-        }
-      });
-
-      return `${parentText}：${biTexts.join(' / ')}`;
-    }
-
-    let text = parent.optionName;
-    if (parent.priceModifier > 0) {
-      text += ` (+$${parent.priceModifier})`;
-    }
-    if (parentChildren.length > 0) {
-      const childrenText = parentChildren.map(c => {
-        let cText = c.optionName;
-        if (c.priceModifier > 0) {
-          cText += `(+$${c.priceModifier})`;
-        }
-        return cText;
-      }).join(' / ');
-      text += ` (${childrenText})`;
-    }
-    return text;
-  });
-
-  return formattedParents.join(' / ');
-};
 
 const OrderList = () => {
   const [activeTab, setActiveTab] = useState('pending_confirm');
@@ -132,19 +29,6 @@ const OrderList = () => {
   // 結帳 Modal 狀態
   const [showCheckout, setShowCheckout] = useState(false);
   const [checkoutOrder, setCheckoutOrder] = useState(null);
-  const [loadingCheckout, setLoadingCheckout] = useState(false);
-  const [checkoutError, setCheckoutError] = useState('');
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [paymentRows, setPaymentRows] = useState([{ method: 'CASH', amount: '' }]);
-  const [carrierNo, setCarrierNo] = useState('');
-  const [loveCode, setLoveCode] = useState('');
-  const [invoiceNo, setInvoiceNo] = useState('');
-  const [splitPeople, setSplitPeople] = useState('');
-
-  const totalAmountVal = Number(checkoutOrder?.totalAmount || 0);
-  const paymentSumVal = paymentRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  const unallocatedAmount = totalAmountVal - paymentSumVal;
 
   // Counts for each tab
   const [counts, setCounts] = useState({ pendingConfirm: 0, active: 0 });
@@ -299,123 +183,17 @@ const OrderList = () => {
   const handleCloseCheckout = () => {
     setShowCheckout(false);
     setCheckoutOrder(null);
-    setCheckoutError('');
-    setPaymentRows([{ method: 'CASH', amount: '' }]);
-    setCarrierNo('');
-    setLoveCode('');
-    setInvoiceNo('');
-    setSplitPeople('');
   };
 
   const handleShowCheckoutModal = (order) => {
     setCheckoutOrder(order);
     setShowCheckout(true);
-    setCheckoutError('');
-    setCarrierNo('');
-    setLoveCode('');
-    setInvoiceNo('');
-    setSplitPeople('');
-    setPaymentRows([{ method: 'CASH', amount: order.totalAmount.toString() }]);
-  };
-
-  const handleCheckoutConfirm = async () => {
-    if (!checkoutOrder) return;
-    setLoadingCheckout(true);
-    setCheckoutError('');
-
-    const totalAmount = Number(checkoutOrder.totalAmount || 0);
-
-    // 1. 驗證支付明細
-    let paymentSum = 0;
-    for (const row of paymentRows) {
-      const amt = Number(row.amount);
-      if (isNaN(amt) || amt <= 0) {
-        setCheckoutError('支付金額必須大於 0');
-        setLoadingCheckout(false);
-        return;
-      }
-      paymentSum += amt;
-    }
-
-    if (Math.abs(paymentSum - totalAmount) > 0.01) {
-      setCheckoutError(`支付金額總和 ($${paymentSum}) 必須等於訂單總金額 ($${totalAmount})`);
-      setLoadingCheckout(false);
-      return;
-    }
-
-    // 2. 驗證手機載具與愛心碼
-    if (carrierNo.trim() && loveCode.trim()) {
-      setCheckoutError('手機載具與愛心碼不可同時使用');
-      setLoadingCheckout(false);
-      return;
-    }
-
-    if (carrierNo.trim()) {
-      const carrierRegex = /^\/[A-Z0-9.+-]{7}$/;
-      if (!carrierRegex.test(carrierNo.trim())) {
-        setCheckoutError('手機載具格式錯誤 (必須以 / 開頭，後接 7 碼大寫英數字或 .+- 符號)');
-        setLoadingCheckout(false);
-        return;
-      }
-    }
-
-    if (loveCode.trim()) {
-      const loveRegex = /^[0-9]{3,7}$/;
-      if (!loveRegex.test(loveCode.trim())) {
-        setCheckoutError('愛心碼格式錯誤 (必須為 3 到 7 碼純數字)');
-        setLoadingCheckout(false);
-        return;
-      }
-    }
-
-    try {
-      const payload = {
-        payments: paymentRows.map(row => ({
-          paymentMethod: row.method,
-          amount: Number(row.amount)
-        })),
-        carrierNo: carrierNo.trim() || null,
-        loveCode: loveCode.trim() || null
-      };
-
-      const res = await fetch(`${API_BASE_URL}/orders/${checkoutOrder.id}/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const json = await res.json();
-      if (json.code === 200) {
-        setInvoiceNo(json.data?.invoiceNo || '');
-        setSuccessMessage(`訂單 ${checkoutOrder.orderNo} 結帳付款成功！`);
-        setShowSuccessModal(true);
-        setShowCheckout(false);
-      } else {
-        setCheckoutError(json.message || '結帳失敗');
-      }
-    } catch (error) {
-      console.error('Error checking out order:', error);
-      setCheckoutError('結帳過程發生錯誤，請稍候重試。');
-    } finally {
-      setLoadingCheckout(false);
-    }
   };
 
   const handleSuccessModalConfirm = () => {
-    setShowSuccessModal(false);
     fetchOrders();
     fetchCounts();
     handleCloseCheckout();
-  };
-
-  // Format dates
-  const formatTime = (value) => {
-    if (!value) return '--';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleTimeString('zh-TW', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }) + ` (${date.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' })})`;
   };
 
   // Filter logic
@@ -703,251 +481,13 @@ const OrderList = () => {
           </div>
         </div>
       )}
-      {/* Checkout Modal */}
-      <Modal show={showCheckout} onHide={handleCloseCheckout} centered size="lg">
-        <Modal.Header closeButton className="border-0 pb-0">
-          <Modal.Title className="fw-bold">訂單結帳確認 - {checkoutOrder?.orderNo}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
-          {checkoutError && (
-            <div className="alert alert-danger py-2 px-3 mb-3 d-flex justify-content-between align-items-center" style={{borderRadius: '10px'}}>
-              <span style={{fontSize: '14px'}}><i className="bi bi-exclamation-triangle-fill me-2"></i>{checkoutError}</span>
-              <button className="btn-close" onClick={() => setCheckoutError('')} style={{fontSize: '11px'}}></button>
-            </div>
-          )}
-
-          {checkoutOrder && (
-            <div className="d-flex flex-column gap-3">
-              <div className="p-3 border rounded-3 bg-light">
-                <div className="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
-                  <span className="fw-bold text-primary" style={{fontSize: '14px'}}>
-                    <i className="bi bi-receipt me-1"></i> {checkoutOrder.tableName || `桌台 ${checkoutOrder.tableId}`} 桌
-                  </span>
-                  <span className="badge bg-secondary">
-                    {checkoutOrder.status}
-                  </span>
-                </div>
-                <div className="d-flex flex-column gap-2 mb-2">
-                  {checkoutOrder.items?.map((item, idx) => (
-                    <div key={item.id || idx} className="d-flex justify-content-between text-secondary align-items-start" style={{fontSize: '14px'}}>
-                      <div style={{ flex: 1, marginRight: '16px' }}>
-                        <div>
-                          {item.productName} <span className="text-dark fw-semibold">x{item.quantity}</span>
-                          {item.note && <span className="ms-2 badge bg-light text-muted border" style={{fontSize: '10px'}}>{item.note}</span>}
-                        </div>
-                        {item.options && item.options.length > 0 && (
-                          <div className="text-muted" style={{ fontSize: '12px', paddingLeft: '8px', marginTop: '2px' }}>
-                            {formatOrderOptions(item.options)}
-                          </div>
-                        )}
-                      </div>
-                      <span className="align-self-start">${item.price * item.quantity}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="text-end fw-bold text-dark pt-1 border-top" style={{fontSize: '14px'}}>
-                  小計: ${checkoutOrder.totalAmount}
-                </div>
-              </div>
-
-              {/* 總計結算 */}
-              <div className="d-flex justify-content-between align-items-center mt-3 p-3 bg-white border border-primary border-opacity-25 rounded-3">
-                <span className="fw-semibold text-secondary">訂單總計</span>
-                <span className="fs-3 fw-bold text-primary">
-                  ${checkoutOrder.totalAmount}
-                </span>
-              </div>
-
-              {/* 複合式支付設定 */}
-              <div className="mt-4 p-3 bg-white border border-opacity-10 rounded-3">
-                <h5 className="fw-bold text-dark mb-3" style={{ fontSize: '15px' }}>
-                  <i className="bi bi-credit-card-2-back me-2 text-primary"></i>付款方式設定
-                </h5>
-
-                {/* 平分人數設定 */}
-                <div className="d-flex align-items-center gap-2 mb-3 p-2 bg-light rounded-3">
-                  <span style={{ fontSize: '13px', color: '#475569', whiteSpace: 'nowrap' }}>
-                    <i className="bi bi-people me-1"></i>平分人數:
-                  </span>
-                  <Form.Control
-                    type="number"
-                    min="1"
-                    placeholder="輸入平分人數"
-                    value={splitPeople}
-                    onChange={(e) => setSplitPeople(e.target.value)}
-                    className="modern-input py-1"
-                    style={{ maxWidth: '120px', fontSize: '13px' }}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm px-3"
-                    style={{ fontSize: '12px', borderRadius: '8px' }}
-                    onClick={() => {
-                      const N = parseInt(splitPeople) || 0;
-                      if (N <= 0) return;
-                      const baseAmount = Math.floor(totalAmountVal / N);
-                      const remainder = Number((totalAmountVal - baseAmount * N).toFixed(2));
-                      const newRows = [];
-                      for (let i = 0; i < N; i++) {
-                        let amt = baseAmount;
-                        if (i === 0) {
-                          amt += remainder;
-                        }
-                        const amtStr = Number(amt.toFixed(2)).toString();
-                        newRows.push({ method: 'CASH', amount: amtStr });
-                      }
-                      setPaymentRows(newRows);
-                    }}
-                  >
-                    平分
-                  </button>
-                </div>
-
-                {paymentRows.map((row, index) => (
-                  <div key={index} className="d-flex gap-2 mb-2 align-items-center">
-                    <Form.Select
-                      value={row.method}
-                      onChange={(e) => {
-                        const newRows = [...paymentRows];
-                        newRows[index].method = e.target.value;
-                        setPaymentRows(newRows);
-                      }}
-                      className="modern-input py-1.5"
-                      style={{ flex: 1 }}
-                    >
-                      <option value="CASH">現金 (CASH)</option>
-                      <option value="LINE_PAY">LINE Pay</option>
-                      <option value="CREDIT_CARD">信用卡 (Credit Card)</option>
-                      <option value="EASY_CARD">悠遊卡 (Easy Card)</option>
-                    </Form.Select>
-                    <Form.Control
-                      type="number"
-                      placeholder="金額"
-                      value={row.amount}
-                      onChange={(e) => {
-                        const newRows = [...paymentRows];
-                        newRows[index].amount = e.target.value;
-                        setPaymentRows(newRows);
-                      }}
-                      className="modern-input py-1.5"
-                      style={{ flex: 1 }}
-                    />
-                    {paymentRows.length > 1 && (
-                      <button
-                        type="button"
-                        className="btn btn-outline-danger btn-sm border-0"
-                        onClick={() => {
-                          setPaymentRows(paymentRows.filter((_, i) => i !== index));
-                        }}
-                      >
-                        <i className="bi bi-trash"></i>
-                      </button>
-                    )}
-                  </div>
-                ))}
-
-                {/* 尚未歸屬金額提示 */}
-                <div className="d-flex justify-content-between align-items-center mt-2 mb-2 px-1 py-1" style={{ fontSize: '13px' }}>
-                  <span>付款明細加總: <strong>${Number(paymentSumVal.toFixed(2))}</strong></span>
-                  {Math.abs(unallocatedAmount) < 0.01 ? (
-                    <span className="text-success fw-semibold"><i className="bi bi-check-circle-fill me-1"></i>金額已完全分配</span>
-                  ) : unallocatedAmount > 0 ? (
-                    <span className="text-warning fw-semibold"><i className="bi bi-exclamation-circle-fill me-1"></i>尚未歸屬金額: ${Number(unallocatedAmount.toFixed(2))}</span>
-                  ) : (
-                    <span className="text-danger fw-semibold"><i className="bi bi-x-circle-fill me-1"></i>超出分配金額: ${Number(Math.abs(unallocatedAmount).toFixed(2))}</span>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  className="btn btn-link btn-sm text-primary p-0 mt-1"
-                  onClick={() => setPaymentRows([...paymentRows, { method: 'CASH', amount: '' }])}
-                >
-                  <i className="bi bi-plus-lg me-1"></i>新增付款方式
-                </button>
-              </div>
-
-              {/* 電子發票設定 */}
-              <div className="mt-3 p-3 bg-white border border-opacity-10 rounded-3">
-                <h5 className="fw-bold text-dark mb-3" style={{ fontSize: '15px' }}>
-                  <i className="bi bi-receipt-cutoff me-2 text-primary"></i>發票設定 (手機載具 / 愛心碼二擇一)
-                </h5>
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <Form.Label style={{ fontSize: '13px', color: '#64748b' }}>手機載具</Form.Label>
-                    <Form.Control
-                      type="text"
-                      placeholder="例如: /AB12345"
-                      value={carrierNo}
-                      onChange={(e) => {
-                        setCarrierNo(e.target.value);
-                        if (e.target.value.trim()) {
-                          setLoveCode('');
-                        }
-                      }}
-                      disabled={!!loveCode.trim()}
-                      className="modern-input"
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <Form.Label style={{ fontSize: '13px', color: '#64748b' }}>愛心碼</Form.Label>
-                    <Form.Control
-                      type="text"
-                      placeholder="例如: 888"
-                      value={loveCode}
-                      onChange={(e) => {
-                        setLoveCode(e.target.value);
-                        if (e.target.value.trim()) {
-                          setCarrierNo('');
-                        }
-                      }}
-                      disabled={!!carrierNo.trim()}
-                      className="modern-input"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer className="border-0 pt-0">
-          <button type="button" className="modern-btn modern-btn-outline" onClick={handleCloseCheckout} disabled={loadingCheckout}>
-            取消
-          </button>
-          <button 
-            type="button" 
-            className="modern-btn" 
-            onClick={handleCheckoutConfirm}
-            disabled={loadingCheckout}
-          >
-            {loadingCheckout ? '處理中...' : `確認付款 ($${checkoutOrder?.totalAmount})`}
-          </button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="custom-modal-overlay">
-          <div className="custom-modal-content">
-            <div className="success-icon-wrapper">
-              <i className="bi bi-check-circle-fill"></i>
-            </div>
-            <h4 className="fw-bold text-dark mb-2">結帳成功！</h4>
-            <p className="text-secondary mb-3" style={{ fontSize: '15px' }}>
-              {successMessage}
-            </p>
-            {invoiceNo && (
-              <div className="mb-4 p-3 bg-light rounded-3 text-center border">
-                <div className="text-muted small mb-1">電子發票號碼</div>
-                <div className="fw-bold text-primary fs-5" style={{ letterSpacing: '1px' }}>{invoiceNo}</div>
-              </div>
-            )}
-            <button className="modern-btn w-100 py-2.5" onClick={handleSuccessModalConfirm}>
-              確定
-            </button>
-          </div>
-        </div>
-      )}
+      <CheckoutModal 
+        show={showCheckout}
+        onHide={handleCloseCheckout}
+        title={checkoutOrder ? `訂單結帳確認 - ${checkoutOrder.orderNo}` : ''}
+        orders={checkoutOrder ? [checkoutOrder] : []}
+        onSuccess={handleSuccessModalConfirm}
+      />
     </div>
   );
 };

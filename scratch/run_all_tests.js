@@ -24,14 +24,30 @@ let failCount = 0;
 const results = [];
 
 for (const testFile of tests) {
+  // Let the server connection pool and WebSocket threads settle
+  execSync('node -e "setTimeout(() => {}, 1000)"');
+
   // Reset database to default baseline state to ensure test isolation
-  try {
-    execSync('node scratch/reset_db.js', {
-      cwd: path.resolve(__dirname, '..'),
-      stdio: 'ignore'
-    });
-  } catch (err) {
-    console.error(`⚠️ Database reset failed before running ${testFile}`);
+  let resetSuccess = false;
+  let lastDbError = '';
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      execSync('node scratch/reset_db.js', {
+        cwd: path.resolve(__dirname, '..'),
+        stdio: 'pipe'
+      });
+      resetSuccess = true;
+      break;
+    } catch (err) {
+      lastDbError = err.stderr ? err.stderr.toString() : (err.stdout ? err.stdout.toString() : err.message);
+      if (attempt < 2) {
+        // Sleep before retry
+        execSync('node -e "setTimeout(() => {}, 2000)"');
+      }
+    }
+  }
+  if (!resetSuccess) {
+    console.error(`⚠️ Database reset failed after 2 attempts before running ${testFile}. Error: ${lastDbError}`);
   }
 
   console.log(`Running: ${testFile}...`);

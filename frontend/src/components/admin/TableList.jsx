@@ -25,6 +25,7 @@ const TableList = () => {
   // QR Code Modal 狀態
   const [showQRCode, setShowQRCode] = useState(false);
   const [qrcodeTable, setQrcodeTable] = useState(null);
+  const [qrcodeImageUrl, setQrcodeImageUrl] = useState(null);
 
   const fetchTables = async () => {
     try {
@@ -141,29 +142,39 @@ const TableList = () => {
     handleCloseCheckout();
   };
 
-  const handleShowQRCode = (table) => {
+  const handleShowQRCode = async (table) => {
     setQrcodeTable(table);
     setShowQRCode(true);
+    setQrcodeImageUrl(null);
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/${table.id}/qrcode`);
+      if (response.ok) {
+        const blob = await response.blob();
+        setQrcodeImageUrl(window.URL.createObjectURL(blob));
+      }
+    } catch (e) {
+      console.error('Error loading QR code:', e);
+    }
   };
 
   const handleCloseQRCode = () => {
     setShowQRCode(false);
     setQrcodeTable(null);
+    if (qrcodeImageUrl) {
+      window.URL.revokeObjectURL(qrcodeImageUrl);
+      setQrcodeImageUrl(null);
+    }
   };
 
-  const handleDownloadQRCode = async () => {
-    if (!qrcodeTable) return;
+  const handleDownloadQRCode = () => {
+    if (!qrcodeTable || !qrcodeImageUrl) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/tables/${qrcodeTable.id}/qrcode`);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
+      link.href = qrcodeImageUrl;
       link.download = `table_${qrcodeTable.name}_qrcode.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading QR code:', error);
     }
@@ -367,6 +378,31 @@ const TableList = () => {
         orders={checkoutOrders}
         onSuccess={handleSuccessModalConfirm}
       />
+
+      {/* QR Code Modal */}
+      <Modal show={showQRCode} onHide={handleCloseQRCode} centered>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">桌台 QR Code - {qrcodeTable?.name}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center pb-4">
+          <div className="p-3 bg-light rounded mb-3 d-inline-block" style={{ minWidth: '200px', minHeight: '200px' }}>
+            {qrcodeImageUrl ? (
+              <img src={qrcodeImageUrl} alt="QR Code" style={{ width: '200px', height: '200px', objectFit: 'contain' }} />
+            ) : (
+              <div className="d-flex align-items-center justify-content-center h-100 text-muted">
+                載入中...
+              </div>
+            )}
+          </div>
+          <p className="text-muted small mb-0">請顧客使用手機掃描上方 QR Code 進行自助點餐</p>
+        </Modal.Body>
+        <Modal.Footer className="border-0 pt-0 justify-content-center">
+          <button type="button" className="modern-btn" onClick={handleDownloadQRCode} disabled={!qrcodeImageUrl}>
+            <i className="bi bi-download"></i> 下載圖片
+          </button>
+        </Modal.Footer>
+      </Modal>
+
       </div>
     </>
   );

@@ -8,7 +8,7 @@
  *   4. CORS 驗證
  */
 
-const BASE = 'http://localhost:8081/api';
+const BASE = 'http://localhost:8080/api';
 let passed = 0;
 let failed = 0;
 const failures = [];

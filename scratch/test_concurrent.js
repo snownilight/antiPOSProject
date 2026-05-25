@@ -1,6 +1,6 @@
 const http = require('http');
 
-const API_BASE = 'http://localhost:8081/api';
+const API_BASE = 'http://localhost:8080/api';
 
 function request(url, method = 'GET', body = null) {
   return new Promise((resolve, reject) => {

@@ -4,8 +4,8 @@
  */
 const http = require('http');
 
-const API_BASE = 'http://localhost:8081/api';
-const WS_BASE = 'http://localhost:8081/ws';
+const API_BASE = 'http://localhost:8080/api';
+const WS_BASE = 'http://localhost:8080/ws';
 
 let jwtToken = '';
 

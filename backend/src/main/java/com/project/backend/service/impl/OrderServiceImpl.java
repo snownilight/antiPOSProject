@@ -73,31 +73,99 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public Order createOrder(OrderCreateRequest request) {
         // 1. 驗證與獲取桌台
-        DiningTable table = null;
-        boolean isGuestOrder = false;
-        
-        if (request.getTableToken() != null && !request.getTableToken().trim().isEmpty()) {
-            isGuestOrder = true;
-            try {
-                table = diningTableService.getTableByToken(request.getTableToken().trim());
-            } catch (Exception e) {
-                throw new IllegalArgumentException("開單失敗：找不到指定的桌台 (Token: " + request.getTableToken() + ")");
-            }
-        } else if (request.getTableId() != null) {
-            try {
-                table = diningTableService.getTableById(request.getTableId());
-            } catch (Exception e) {
-                throw new IllegalArgumentException("開單失敗：找不到指定的桌台 (ID: " + request.getTableId() + ")");
-            }
-        } else {
-            throw new IllegalArgumentException("開單失敗：桌台 ID 或 Token 不能為空");
-        }
+        DiningTable table = validateAndFetchTable(request);
 
         // 2. 計算總金額與建立訂單品項
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<OrderItem> itemsToCreate = new ArrayList<>();
 
         for (OrderItemCreateRequest itemReq : request.getItems()) {
+            OrderItem orderItem = processOrderItem(itemReq);
+            totalAmount = totalAmount.add(orderItem.getSubtotal());
+            itemsToCreate.add(orderItem);
+        }
+
+        // 3. 產生 15 碼訂單編號
+        String orderNo = generateOrderNo();
+
+        // 4. 決定初始狀態與插入訂單主檔
+        boolean isGuestOrder = request.getTableToken() != null && !request.getTableToken().trim().isEmpty();
+        String initialStatus = (isGuestOrder && requireStaffConfirm) ? "PENDING_CONFIRM" : "PENDING";
+
+        Order order = new Order();
+        order.setTableId(table.getId());
+        order.setOrderNo(orderNo);
+        order.setTotalAmount(totalAmount);
+        order.setStatus(initialStatus);
+        orderMapper.insert(order);
+
+        // 5. 插入訂單明細
+        saveOrderItems(order.getId(), itemsToCreate);
+
+        // 6. 連動更新桌台狀態為 OCCUPIED (用餐中)
+        if (!"OCCUPIED".equalsIgnoreCase(table.getStatus())) {
+            diningTableService.updateTableStatus(table.getId(), "OCCUPIED");
+        }
+
+        Order createdOrder = getOrderById(order.getId());
+
+        if ("PENDING".equals(initialStatus)) {
+            deductStock(createdOrder);
+        }
+
+        // 7. 廣播 WebSocket 事件 (POS-33)
+        broadcastOrderEvent("ORDER_CREATED", createdOrder);
+
+        return createdOrder;
+    }
+
+    private DiningTable validateAndFetchTable(OrderCreateRequest request) {
+        if (request.getTableToken() != null && !request.getTableToken().trim().isEmpty()) {
+            try {
+                return diningTableService.getTableByToken(request.getTableToken().trim());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("開單失敗：找不到指定的桌台 (Token: " + request.getTableToken() + ")");
+            }
+        } else if (request.getTableId() != null) {
+            try {
+                return diningTableService.getTableById(request.getTableId());
+            } catch (Exception e) {
+                throw new IllegalArgumentException("開單失敗：找不到指定的桌台 (ID: " + request.getTableId() + ")");
+            }
+        } else {
+            throw new IllegalArgumentException("開單失敗：桌台 ID 或 Token 不能為空");
+        }
+    }
+
+    private void saveOrderItems(Long orderId, List<OrderItem> itemsToCreate) {
+        for (OrderItem item : itemsToCreate) {
+            item.setOrderId(orderId);
+            orderMapper.insertOrderItem(item);
+            
+            if (item.getOptions() != null) {
+                Map<Long, Long> parentDbIdMap = new HashMap<>();
+                for (OrderItemOption opt : item.getOptions()) {
+                    if (opt.getParentId() == null) {
+                        opt.setOrderItemId(item.getId());
+                        orderMapper.insertOrderItemOption(opt);
+                        parentDbIdMap.put(opt.getOptionId(), opt.getId());
+                    }
+                }
+                
+                for (OrderItemOption opt : item.getOptions()) {
+                    if (opt.getParentId() != null) {
+                        Long dbParentId = parentDbIdMap.get(opt.getParentId());
+                        opt.setOrderItemId(item.getId());
+                        opt.setParentId(dbParentId);
+                        orderMapper.insertOrderItemOption(opt);
+                    }
+                }
+            }
+        }
+    }
+
+    private OrderItem processOrderItem(OrderItemCreateRequest itemReq) {
+
             Product product;
             try {
                 product = productService.getProductById(itemReq.getProductId());
@@ -518,7 +586,7 @@ public class OrderServiceImpl implements OrderService {
             BigDecimal price = product.getPrice().add(priceModifierSum);
             BigDecimal quantity = new BigDecimal(itemReq.getQuantity());
             BigDecimal subtotal = price.multiply(quantity);
-            totalAmount = totalAmount.add(subtotal);
+
 
             OrderItem orderItem = new OrderItem();
             orderItem.setProductId(product.getId());
@@ -528,69 +596,10 @@ public class OrderServiceImpl implements OrderService {
             orderItem.setSubtotal(subtotal);
             orderItem.setNote(itemReq.getNote());
             orderItem.setOptions(selectedOptions);
-            itemsToCreate.add(orderItem);
-        }
-
-        // 3. 產生 15 碼訂單編號
-        String orderNo = generateOrderNo();
-
-        // 4. 決定初始狀態與插入訂單主檔
-        String initialStatus = "PENDING";
-        if (isGuestOrder && requireStaffConfirm) {
-            initialStatus = "PENDING_CONFIRM";
-        }
-
-        Order order = new Order();
-        order.setTableId(table.getId());
-        order.setOrderNo(orderNo);
-        order.setTotalAmount(totalAmount);
-        order.setStatus(initialStatus);
-        orderMapper.insert(order);
-
-        // 5. 插入訂單明細
-        for (OrderItem item : itemsToCreate) {
-            item.setOrderId(order.getId());
-            orderMapper.insertOrderItem(item);
-            
-            if (item.getOptions() != null) {
-                // 先插入所有一級/父選項，並建立 optionId 到資料庫 ID (id) 的對應
-                Map<Long, Long> parentDbIdMap = new HashMap<>();
-                for (OrderItemOption opt : item.getOptions()) {
-                    if (opt.getParentId() == null) {
-                        opt.setOrderItemId(item.getId());
-                        orderMapper.insertOrderItemOption(opt);
-                        parentDbIdMap.put(opt.getOptionId(), opt.getId());
-                    }
-                }
-                
-                // 再插入所有二級/子選項，將 parentId 設為對應的資料庫一級選項 ID
-                for (OrderItemOption opt : item.getOptions()) {
-                    if (opt.getParentId() != null) {
-                        Long dbParentId = parentDbIdMap.get(opt.getParentId());
-                        opt.setOrderItemId(item.getId());
-                        opt.setParentId(dbParentId);
-                        orderMapper.insertOrderItemOption(opt);
-                    }
-                }
-            }
-        }
-
-        // 6. 連動更新桌台狀態為 OCCUPIED (用餐中)
-        if (!"OCCUPIED".equalsIgnoreCase(table.getStatus())) {
-            diningTableService.updateTableStatus(table.getId(), "OCCUPIED");
-        }
-
-        Order createdOrder = getOrderById(order.getId());
-
-        if ("PENDING".equals(initialStatus)) {
-            deductStock(createdOrder);
-        }
-
-        // 7. 廣播 WebSocket 事件 (POS-33)
-        broadcastOrderEvent("ORDER_CREATED", createdOrder);
-
-        return createdOrder;
+            return orderItem;
+        
     }
+
 
     @Override
     public Order getOrderById(Long id) {
@@ -782,82 +791,73 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private void changeProductStock(Long productId, int quantity, boolean isDeduct) {
-        try {
-            Product product = productService.getProductById(productId);
-            if (product != null) {
-                int currentStock = product.getStock() != null ? product.getStock() : 0;
-                int newStock;
-                if (isDeduct) {
-                    newStock = Math.max(0, currentStock - quantity);
-                    product.setStock(newStock);
-                    if (newStock == 0) {
-                        product.setStatus("SOLD_OUT");
-                    }
-                } else {
-                    newStock = currentStock + quantity;
-                    product.setStock(newStock);
-                    if ("SOLD_OUT".equalsIgnoreCase(product.getStatus()) && newStock > 0) {
-                        product.setStatus("AVAILABLE");
-                    }
+        Product product = productService.getProductById(productId);
+        if (product != null) {
+            int currentStock = product.getStock() != null ? product.getStock() : 0;
+            int newStock;
+            if (isDeduct) {
+                if (currentStock < quantity) {
+                    throw new IllegalArgumentException("商品 " + product.getName() + " 庫存不足！(剩餘: " + currentStock + ")");
                 }
-                productService.updateProduct(product.getId(), product);
-                
-                int threshold = product.getStockAlertThreshold() != null ? product.getStockAlertThreshold() : 0;
-                if (newStock <= threshold || "SOLD_OUT".equalsIgnoreCase(product.getStatus())) {
-                    dashboardService.broadcastStockAlert(product);
+                newStock = currentStock - quantity;
+                product.setStock(newStock);
+                if (newStock == 0) {
+                    product.setStatus("SOLD_OUT");
+                }
+            } else {
+                newStock = currentStock + quantity;
+                product.setStock(newStock);
+                if ("SOLD_OUT".equalsIgnoreCase(product.getStatus()) && newStock > 0) {
+                    product.setStatus("AVAILABLE");
                 }
             }
-        } catch (Exception e) {
-            log.error("Failed to update stock for product ID: " + productId, e);
+            productService.updateProduct(product.getId(), product);
+            
+            int threshold = product.getStockAlertThreshold() != null ? product.getStockAlertThreshold() : 0;
+            if (newStock <= threshold || "SOLD_OUT".equalsIgnoreCase(product.getStatus())) {
+                dashboardService.broadcastStockAlert(product);
+            }
         }
     }
 
     private void deductStock(Order order) {
-        try {
-            List<OrderItem> items = orderMapper.findItemsByOrderId(order.getId());
-            if (items != null) {
-                for (OrderItem item : items) {
-                    // 1. Deduct primary product stock
-                    changeProductStock(item.getProductId(), item.getQuantity(), true);
-                    
-                    // 2. Deduct selected products in combo options
-                    if (item.getOptions() != null) {
-                        for (OrderItemOption opt : item.getOptions()) {
-                            if (opt.getSelectedProductId() != null) {
-                                changeProductStock(opt.getSelectedProductId(), item.getQuantity(), true);
-                            }
+        List<OrderItem> items = orderMapper.findItemsByOrderId(order.getId());
+        if (items != null) {
+            for (OrderItem item : items) {
+                // 1. Deduct primary product stock
+                changeProductStock(item.getProductId(), item.getQuantity(), true);
+                
+                // 2. Deduct selected products in combo options
+                if (item.getOptions() != null) {
+                    for (OrderItemOption opt : item.getOptions()) {
+                        if (opt.getSelectedProductId() != null) {
+                            changeProductStock(opt.getSelectedProductId(), item.getQuantity(), true);
                         }
                     }
                 }
             }
-            dashboardService.broadcastDashboardUpdate();
-        } catch (Exception e) {
-            log.error("Failed to deduct stock for order ID: " + order.getId(), e);
         }
+        dashboardService.broadcastDashboardUpdate();
     }
 
     private void replenishStock(Order order) {
-        try {
-            List<OrderItem> items = orderMapper.findItemsByOrderId(order.getId());
-            if (items != null) {
-                for (OrderItem item : items) {
-                    // 1. Replenish primary product stock
-                    changeProductStock(item.getProductId(), item.getQuantity(), false);
-                    
-                    // 2. Replenish selected products in combo options
-                    if (item.getOptions() != null) {
-                        for (OrderItemOption opt : item.getOptions()) {
-                            if (opt.getSelectedProductId() != null) {
-                                changeProductStock(opt.getSelectedProductId(), item.getQuantity(), false);
-                            }
+        List<OrderItem> items = orderMapper.findItemsByOrderId(order.getId());
+        if (items != null) {
+            for (OrderItem item : items) {
+                // 1. Replenish primary product stock
+                changeProductStock(item.getProductId(), item.getQuantity(), false);
+                
+                // 2. Replenish selected products in combo options
+                if (item.getOptions() != null) {
+                    for (OrderItemOption opt : item.getOptions()) {
+                        if (opt.getSelectedProductId() != null) {
+                            changeProductStock(opt.getSelectedProductId(), item.getQuantity(), false);
                         }
                     }
                 }
             }
-            dashboardService.broadcastDashboardUpdate();
-        } catch (Exception e) {
-            log.error("Failed to replenish stock for order ID: " + order.getId(), e);
         }
+        dashboardService.broadcastDashboardUpdate();
     }
 
     private void processPaymentSuccess(Order order) {
